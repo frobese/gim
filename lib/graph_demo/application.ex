@@ -9,7 +9,10 @@ defmodule GraphDemo.Application do
     # List all child processes to be supervised
     children = [
       # Start the endpoint when the application starts
-      GraphDemoWeb.Endpoint
+      GraphDemoWeb.Endpoint,
+      GraphDemo.Acl.Repo,
+      GraphDemo.Biblio.Repo,
+      GraphDemo.Movies.Repo,
       # Starts a worker by calling: GraphDemo.Worker.start_link(arg)
       # {GraphDemo.Worker, arg},
     ]
