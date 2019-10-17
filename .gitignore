@@ -34,3 +34,9 @@ graph_demo-*.tar
 # secrets files as long as you replace their contents by environment
 # variables.
 /config/*.secret.exs
+
+# The directory NPM downloads your dependencies sources to.
+/node_modules/
+
+# Editor and IDE artifacts
+.elixir_ls
