@@ -4,7 +4,7 @@ defmodule GraphDemo.Movies.Genre do
   alias GraphDemo.Movies.Movie
 
   schema do
-    field :name, :string, index: :unique
-    has_many :movies, Movie, reflect: :genre
+    property :name, index: :unique
+    has_edges :movies, Movie, reflect: :genre
   end
 end

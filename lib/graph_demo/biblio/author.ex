@@ -4,8 +4,8 @@ defmodule GraphDemo.Biblio.Author do
   alias GraphDemo.Biblio.Book
 
   schema do
-    field :name, :string, index: :unique
-    field :age, :integer, default: 0, index: true
-    has_many :books, Book, reflect: :author
+    property :name, index: :unique
+    property :age, default: 0, index: true
+    has_edges :author_of, Book, reflect: :authored_by
   end
 end

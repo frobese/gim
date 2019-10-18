@@ -13,6 +13,7 @@ defmodule GraphDemo.Application do
       GraphDemo.Acl.Repo,
       GraphDemo.Biblio.Repo,
       GraphDemo.Movies.Repo,
+      GraphDemo.Untyped.Repo,
       # Starts a worker by calling: GraphDemo.Worker.start_link(arg)
       # {GraphDemo.Worker, arg},
     ]

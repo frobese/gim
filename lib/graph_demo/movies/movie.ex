@@ -1,14 +1,13 @@
 defmodule GraphDemo.Movies.Movie do
   use Gim.Schema
 
-  alias GraphDemo.Movies.Person
-  alias GraphDemo.Movies.Genre
+  alias GraphDemo.Movies.{Genre, Person, Performance}
 
   schema do
-    field :name, :string, index: :unique
-    field :initial_release_date, :string, index: true
-    has_many :genre, Genre, reflect: :movies
-    has_many :director, Person, reflect: :director
-    has_many :starring, Person, reflect: :starring
+    property :name, index: :unique
+    property :initial_release_date, index: true
+    has_edges :genre, Genre, reflect: :movies
+    has_edges :director, Person, reflect: :director
+    has_edges :starring, Performance, reflect: :film
   end
 end

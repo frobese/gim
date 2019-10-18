@@ -1,6 +1,6 @@
 module.exports = {
-    title: 'Graph Demo',
-    description: 'Graph Demo.',
+    title: 'Gim',
+    description: 'Graphs In-Memory.',
     base: "/",
     dest: "priv/static",
     patterns: ['*.md'],

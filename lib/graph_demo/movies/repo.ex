@@ -8,6 +8,8 @@ defmodule GraphDemo.Movies.Repo do
       Movies.Person,
       Movies.Genre,
       Movies.Movie,
+      Movies.Performance,
+      Movies.Character,
     ]
 
   # example loader
@@ -33,6 +35,21 @@ defmodule GraphDemo.Movies.Repo do
     get_or_insert(node)
   end
   def load(%Movies.Person{} = node) do
+    get_or_insert(node)
+  end
+  def load(%Movies.Performance{film: film, actor: actor, character: character}) do
+    film = get_or_create(Movies.Movie, film)
+    actor = get_or_create(Movies.Person, actor)
+    character = get_or_create(Movies.Character, character)
+
+    # insert performance -- TODO: this won't resolve
+    %Movies.Performance{}
+    |> Movies.Performance.set_film(film)
+    |> Movies.Performance.set_actor(actor)
+    |> Movies.Performance.set_character(character)
+    |> Repo.insert()
+  end
+  def load(%Movies.Character{} = node) do
     get_or_insert(node)
   end
 

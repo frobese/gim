@@ -10,50 +10,50 @@ alias GraphDemo.Biblio.{Repo, Author, Book, Publisher}
 # b3 = %Book{title: "The Light Fantastic"} |> Repo.insert()
 # b4 = %Book{title: "Hogfather"} |> Repo.insert()
 #
-# p1 = %Publisher{link: "Ace Books"} |> Repo.insert()
-# p2 = %Publisher{link: "Victor Gollancz"} |> Repo.insert()
-# p3 = %Publisher{link: "Colin Smythe"} |> Repo.insert()
+# p1 = %Publisher{name: "Ace Books"} |> Repo.insert()
+# p2 = %Publisher{name: "Victor Gollancz"} |> Repo.insert()
+# p3 = %Publisher{name: "Colin Smythe"} |> Repo.insert()
 
 # Manually insert some Edges:
 
-# b1 = b1 |> Book.set_author(a1) |> Book.add_publishers(p1) |> Repo.update()
-# b2 = b2 |> Book.set_author(a1) |> Book.add_publishers(p2) |> Repo.update()
-# b3 = b3 |> Book.set_author(a2) |> Book.add_publishers(p3) |> Repo.update()
-# b4 = b4 |> Book.set_author(a2) |> Book.add_publishers(p2) |> Repo.update()
+# b1 = b1 |> Book.set_authored_by(a1) |> Book.add_published_by(p1) |> Repo.update()
+# b2 = b2 |> Book.set_authored_by(a1) |> Book.add_published_by(p2) |> Repo.update()
+# b3 = b3 |> Book.set_authored_by(a2) |> Book.add_published_by(p3) |> Repo.update()
+# b4 = b4 |> Book.set_authored_by(a2) |> Book.add_published_by(p2) |> Repo.update()
 #
-# a1 = a1 |> Author.add_books([b1, b2]) |> Repo.update()
-# a1 = a2 |> Author.add_books([b3, b4]) |> Repo.update()
+# a1 = a1 |> Author.add_author_of([b1, b2]) |> Repo.update()
+# a1 = a2 |> Author.add_author_of([b3, b4]) |> Repo.update()
 #
-# p1 = p1 |> Publisher.add_books(b1) |> Repo.update()
-# p2 = p2 |> Publisher.add_books([b2, b4]) |> Repo.update()
-# p3 = p3 |> Publisher.add_books(b3) |> Repo.update()
+# p1 = p1 |> Publisher.add_publisher_of(b1) |> Repo.update()
+# p2 = p2 |> Publisher.add_publisher_of([b2, b4]) |> Repo.update()
+# p3 = p3 |> Publisher.add_publisher_of(b3) |> Repo.update()
 
 # -or- Import Nodes
 
 nodes1 = %{
-  "a1" => %Author{name: "William Gibson",     books: ["b1", "b2"] },
-  "a2" => %Author{name: "Terry Pratchett",    books: ["b3", "b4"] },
-  "b1" => %Book{title: "Neuromancer",         author: "a1", publishers: ["p1"] },
-  "b2" => %Book{title: "Count Zero",          author: "a1", publishers: ["p2"] },
-  "b3" => %Book{title: "The Light Fantastic", author: "a2", publishers: ["p3"] },
-  "b4" => %Book{title: "Hogfather",           author: "a2", publishers: ["p2"] },
-  "p1" => %Publisher{name: "Ace Books",       books: ["b1"] },
-  "p2" => %Publisher{name: "Victor Gollancz", books: ["b2", "b4"] },
-  "p3" => %Publisher{name: "Colin Smythe",    books: ["b3"] },
+  "a1" => %Author{name: "William Gibson",     author_of: ["b1", "b2"] },
+  "a2" => %Author{name: "Terry Pratchett",    author_of: ["b3", "b4"] },
+  "b1" => %Book{title: "Neuromancer",         authored_by: "a1", published_by: ["p1"] },
+  "b2" => %Book{title: "Count Zero",          authored_by: "a1", published_by: ["p2"] },
+  "b3" => %Book{title: "The Light Fantastic", authored_by: "a2", published_by: ["p3"] },
+  "b4" => %Book{title: "Hogfather",           authored_by: "a2", published_by: ["p2"] },
+  "p1" => %Publisher{name: "Ace Books",       publisher_of: ["b1"] },
+  "p2" => %Publisher{name: "Victor Gollancz", publisher_of: ["b2", "b4"] },
+  "p3" => %Publisher{name: "Colin Smythe",    publisher_of: ["b3"] },
 }
 
 # -or-
 
 nodes2 = %{
-  "a1" => %Author{name: "William Gibson",     books: ["b1", "b2"] },
-  "a2" => %Author{name: "Terry Pratchett",    books: ["b3", "b4"] },
+  "a1" => %Author{name: "William Gibson",     author_of: ["b1", "b2"] },
+  "a2" => %Author{name: "Terry Pratchett",    author_of: ["b3", "b4"] },
   "b1" => %Book{title: "Neuromancer",         },
   "b2" => %Book{title: "Count Zero",          },
   "b3" => %Book{title: "The Light Fantastic", },
   "b4" => %Book{title: "Hogfather",           },
-  "p1" => %Publisher{name: "Ace Books",       books: ["b1"] },
-  "p2" => %Publisher{name: "Victor Gollancz", books: ["b2", "b4"] },
-  "p3" => %Publisher{name: "Colin Smythe",    books: ["b3"] },
+  "p1" => %Publisher{name: "Ace Books",       publisher_of: ["b1"] },
+  "p2" => %Publisher{name: "Victor Gollancz", publisher_of: ["b2", "b4"] },
+  "p3" => %Publisher{name: "Colin Smythe",    publisher_of: ["b3"] },
 }
 
 # -or-
@@ -61,10 +61,10 @@ nodes2 = %{
 nodes = %{
   "a1" => %Author{name: "William Gibson",     },
   "a2" => %Author{name: "Terry Pratchett",    },
-  "b1" => %Book{title: "Neuromancer",         author: "a1", publishers: ["p1"] },
-  "b2" => %Book{title: "Count Zero",          author: "a1", publishers: ["p2"] },
-  "b3" => %Book{title: "The Light Fantastic", author: "a2", publishers: ["p3"] },
-  "b4" => %Book{title: "Hogfather",           author: "a2", publishers: ["p2"] },
+  "b1" => %Book{title: "Neuromancer",         authored_by: "a1", published_by: ["p1"] },
+  "b2" => %Book{title: "Count Zero",          authored_by: "a1", published_by: ["p2"] },
+  "b3" => %Book{title: "The Light Fantastic", authored_by: "a2", published_by: ["p3"] },
+  "b4" => %Book{title: "Hogfather",           authored_by: "a2", published_by: ["p2"] },
   "p1" => %Publisher{name: "Ace Books",       },
   "p2" => %Publisher{name: "Victor Gollancz", },
   "p3" => %Publisher{name: "Colin Smythe",    },
@@ -77,29 +77,53 @@ Repo.import(nodes)
 # Repo.all(Book)
 # Repo.all(Publisher)
 
-# Repo.get(Author, :name, "William Gibson") |> Author.books() |> Enum.map(&Book.author/1)
+# Repo.get(Author, :name, "William Gibson") |> Author.author_of() |> Enum.map(&Book.authored_by/1)
 # -or-
 
-import Gim.Query, only: [edge: 2, edges: 2, field: 2]
-# Repo.get(Author, :name, "William Gibson") |> edges(:books) |> Enum.map(&edge(&1, :publishers))
-# Repo.get(Author, :name, "William Gibson") |> edges(:books) |> edges(:publishers)
-# Repo.get(Author, :name, "William Gibson") |> edges(:books) |> edges(:publishers) |> edges(:books) |> edge(:author)
+import Gim.Query, only: [edge: 2, edges: 2, property: 2]
+# Repo.get(Author, :name, "William Gibson") |> edges(:author_of) |> Enum.map(&edge(&1, :published_by))
+# Repo.get(Author, :name, "William Gibson") |> edges(:author_of) |> edges(:published_by)
+# Repo.get(Author, :name, "William Gibson") |> edges(:author_of) |> edges(:published_by) |> edges(:publisher_of) |> edge(:authored_by)
 
-# Author.__schema__(:fields)
-# Author.__schema__(:type, :books)
+# Author.__schema__(:properties)
+# Author.__schema__(:type, :author_of)
 # Author.__schema__(:associations)
+
+#
+# -- Untyped example --
+#
+
+alias GraphDemo.Untyped
+alias GraphDemo.Untyped.{Contact, Hobby, Location}
+
+p1 = %Contact{name: "foo"}
+p2 = %Contact{name: "bar"}
+h1 = %Hobby{outdoors?: true}
+l2 = %Location{area: "The North"}
+
+n1 = %Untyped.Node{id: "one", data: p1} |> Untyped.Repo.insert()
+n2 = %Untyped.Node{id: "two", data: p2} |> Untyped.Repo.insert()
+n3 = %Untyped.Node{id: "three", data: h1} |> Untyped.Repo.insert()
+n4 = %Untyped.Node{id: "four", data: l2} |> Untyped.Repo.insert()
+
+n1 = n1 |> Untyped.Node.add_links(n2) |> Untyped.Repo.update()
+n1 = n1 |> Untyped.Node.add_links(n3) |> Untyped.Repo.update()
+n2 = n2 |> Untyped.Node.add_links(n4) |> Untyped.Repo.update()
 
 #
 # -- Movies Demo --
 #
 
-alias GraphDemo.Movies.{Person, Genre, Movie}
+alias GraphDemo.Movies.{Person, Genre, Movie, Character, Performance}
 alias GraphDemo.Movies
 
-# Movies.Data.import("data.csv")|> Enum.into(%{}) |> Movies.Repo.import()
-# Movies.Repo.get(Person, :name, "Sigourney Weaver")
-# Movies.Repo.get(Movie, :name, "Bugs Bunny") |> edges(:director)
-# Movies.Repo.get(Movie, :name, "Bugs Bunny") |> edges(:director) |> edges(:director) |> field(:name)
+# "1million.rdf.gz" |> File.stream!([:compressed]) |> Gim.Rdf.read_rdf() |> Movies.Data.map_movies() |> Movies.Repo.import(errors: :ignore)
+# -or-  Movies.Data.demo_import()
+
+# Movies.Repo.get(Person, :name, "Sigourney Weaver") |> edges(:actor) |> edges(:film)
+
+# Who played alongside the character Bugs Bunnny?
+# Movies.Repo.get(Character, :name, "Bugs Bunny") |> edges(:performances) |> edges(:film) |> edges(:starring) |> edges(:character)
 
 #
 # -- Acl Demo
@@ -155,6 +179,6 @@ intern = Acl.Repo.fetch!(Resource, :name, "Intern")
 extern = Acl.Repo.fetch!(Resource, :name, "Extern")
 
 # Gim.Query.reachable(admin |> edges(:accesses), :resource, intern)
-# Gim.Query.reachable(admin |> edges(:accesses), :resource, extern) |> edge(:role) |> field(:name)
+# Gim.Query.reachable(admin |> edges(:accesses), :resource, extern) |> edge(:role) |> property(:name)
 
 # Gim.Query.isolated(Movies.Repo) |> Enum.each(&Movies.Repo.delete/1)

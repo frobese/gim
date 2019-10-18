@@ -4,7 +4,7 @@ defmodule GraphDemo.Acl.Permission do
   alias GraphDemo.Acl.Role
 
   schema do
-    field :name, :string, index: :unique
-    has_many :roles, Role, reflect: :permissions
+    property :name, index: :unique
+    has_edges :roles, Role, reflect: :permissions
   end
 end

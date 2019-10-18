@@ -4,7 +4,7 @@ defmodule GraphDemo.Acl.Resource do
   alias GraphDemo.Acl.Access
 
   schema do
-    field :name, :string, index: :unique
-    has_many :accesses, Access, reflect: :resource
+    property :name, index: :unique
+    has_edges :accesses, Access, reflect: :resource
   end
 end

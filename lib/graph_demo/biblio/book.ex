@@ -5,9 +5,9 @@ defmodule GraphDemo.Biblio.Book do
   alias GraphDemo.Biblio.Publisher
 
   schema do
-    field :title, :string, index: :unique
-    field :body, :string
-    has_one :author, Author, reflect: :books
-    has_many :publishers, Publisher, reflect: :books
+    property :title, index: :unique
+    property :body
+    has_edge :authored_by, Author, reflect: :author_of
+    has_edges :published_by, Publisher, reflect: :publisher_of
   end
 end

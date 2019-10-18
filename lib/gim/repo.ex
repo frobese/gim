@@ -24,7 +24,7 @@ defmodule Gim.Repo do
       use GenServer
 
       for type <- types do
-        ref = :"#{__MODULE__}.#{type}"
+        ref = Module.concat(__MODULE__, type)
         uindexes = type.__schema__(:indexes_unique)
         nindexes = type.__schema__(:indexes_non_unique)
         defmodule ref do
@@ -46,7 +46,7 @@ defmodule Gim.Repo do
       @impl true
       def init(_args) do
         tables = Enum.into(unquote(types), %{}, fn type ->
-          ref = :"#{__MODULE__}.#{type}"
+          ref = Module.concat(__MODULE__, type)
           {type, struct(ref, %{})}
         end)
 
@@ -57,16 +57,17 @@ defmodule Gim.Repo do
 
       @impl true
       def handle_call({:all}, _from, state) do
-        nodes = Enum.map(state, fn {type, table} ->
-          ref = :"#{__MODULE__}.#{type}"
+        nodes = for type <- unquote(types) do
+          ref = Module.concat(__MODULE__, type)
+          %{^type => table} = state
           ref.all(table)
-        end) |> List.flatten()
+        end |> List.flatten()
 
         {:reply, nodes, state}
       end
 
       for type <- types do
-        ref = :"#{__MODULE__}.#{type}"
+        ref = Module.concat(__MODULE__, type)
 
         @impl true
         def handle_call({:all, unquote(type)}, _from, %{unquote(type) => table} = state) do
@@ -231,7 +232,7 @@ defmodule Gim.Repo do
         table # unset single edge
       end
       for type <- types do
-        ref = :"#{__MODULE__}.#{type}"
+        ref = Module.concat(__MODULE__, type)
         def reflect_edge(%{__struct__: unquote(ref)} = table, reflect, id, target) do
           node = unquote(ref).fetch!(table, target)
           node = put_edge(node, reflect, id)
@@ -375,6 +376,7 @@ defmodule Gim.Repo do
       """
       def update(node, opts \\ []) do
         GenServer.cast(__MODULE__, {:update, node})
+        node
       end
 
       @doc """
@@ -444,6 +446,22 @@ defmodule Gim.Repo do
         nodes
           |> Enum.map(fn {k, n} -> resolve_node(n, nodes, errors) end)
           |> Enum.map(fn n -> merge(n) end)
+      end
+
+      # Export helper
+
+      def type_aliases() do
+        types = unquote(types)
+        offset = prefix_len(types)
+        Enum.into(types, %{}, fn x -> {x, String.slice(to_string(x), offset..-1)} end)
+      end
+
+      defp prefix_len([]), do: ""
+      defp prefix_len(strs) do
+        min = Enum.min(strs) |> to_string()
+        max = Enum.max(strs) |> to_string()
+        index = Enum.find_index(0..String.length(min), fn i -> String.at(min, i) != String.at(max, i) end)
+        if index, do: index, else: String.length(min)
       end
 
     end
