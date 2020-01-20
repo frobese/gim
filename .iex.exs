@@ -147,6 +147,7 @@ acls = %{
   "intern" => %Resource{ name: "Intern" },
   "extern" => %Resource{ name: "Extern" },
   "fachgruppe" => %Resource{ name: "Fachgruppe" },
+  "fachgruppe2" => %Resource{ name: "Fachgruppe2" },
   "handel.a" => %Resource{ name: "Handel A" },
   "handel.b" => %Resource{ name: "Handel B" },
 

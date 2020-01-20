@@ -19,8 +19,8 @@ defmodule GraphDemo.Movies.Data do
   def build_node({key, props}) do
     dgraph_type = List.keyfind(props, :"dgraph.type", 0)
     initial_release_date = List.keyfind(props, :initial_release_date, 0)
-    director = List.keyfind(props, :"director.film", 0)
-    character = List.keyfind(props, :"performance.character", 0)
+    director = List.keyfind(props, :director, 0)
+    character = List.keyfind(props, :character, 0)
     node = cond do
       character != nil -> build(%Performance{}, props)
       initial_release_date != nil -> build(%Movie{}, props)
@@ -33,24 +33,28 @@ defmodule GraphDemo.Movies.Data do
     {key, node}
   end
 
+  def predicate_fun("performance.character"), do: :character
+  def predicate_fun("performance.actor"), do: :actor
+  def predicate_fun("performance.film"), do: :film
+  def predicate_fun("actor.film"), do: :actor
+  def predicate_fun("director.film"), do: :director
+  def predicate_fun(string), do: String.to_atom(string)
+
   defp build(node, []),
     do: node
   defp build(node, [{:name, {:en, name}} | props]),
     do: build(%{node | name: name}, props)
 
-  defp build(node, [{:"performance.character", edge} | props]),
+  defp build(node, [{:character, edge} | props]),
     do: build(%{node | character: edge}, props)
-  defp build(node, [{:"performance.actor", edge} | props]),
+  defp build(node, [{:actor, edge} | props]),
     do: build(%{node | actor: edge}, props)
-  defp build(node, [{:"performance.film", edge} | props]),
+  defp build(node, [{:film, edge} | props]),
     do: build(%{node | film: edge}, props)
-
-  defp build(node, [{:"actor.film", edge} | props]),
-    do: build(%{node | actor: edge}, props)
 
   defp build(node, [{:initial_release_date, value} | props]),
     do: build(%{node | initial_release_date: value}, props)
-  defp build(%{director: director} = node, [{:"director.film", edge} | props]),
+  defp build(%{director: director} = node, [{:director, edge} | props]),
     do: build(%{node | director: [edge | director]}, props)
   defp build(%{starring: starring} = node, [{:starring, edge} | props]),
     do: build(%{node | starring: [edge | starring]}, props)
@@ -73,7 +77,7 @@ defmodule GraphDemo.Movies.Data do
     empty = :erlang.memory(:total)
 
     {usecs, data} = :timer.tc(fn ->
-      "1million.rdf.gz" |> File.stream!([:compressed]) |> Gim.Rdf.read_rdf()
+      "1million.rdf.gz" |> File.stream!([:compressed]) |> Gim.Rdf.read_rdf(&Data.predicate_fun/1)
     end)
     count = data |> Enum.count()
     secs = usecs / 1_000_000
@@ -167,7 +171,7 @@ defmodule GraphDemo.Movies.Data do
 
   def demo_load() do
     {usecs, data} = :timer.tc(fn ->
-      "1million.rdf.gz" |> File.stream!([:compressed]) |> Gim.Rdf.read_rdf()
+      "1million.rdf.gz" |> File.stream!([:compressed]) |> Gim.Rdf.read_rdf(&Data.predicate_fun/1)
       |> Data.map_movies()
     end)
     secs = usecs / 1_000_000
@@ -208,14 +212,40 @@ defmodule GraphDemo.Movies.Data do
       starring: node.starring |> resolve_edges(map),
     }
   end
-  def resolve_node(node, _map) do
-    node
+  def resolve_node(%{__struct__:  Person} = node, map) do
+    %{node |
+      director: node.director |> resolve_edges(map),
+      actor: node.actor |> resolve_edges(map),
+    }
   end
+  def resolve_node(%{__struct__:  Performance} = node, map) do
+    %{node |
+      film: node.film |> resolve_edges(map),
+      actor: node.actor |> resolve_edges(map),
+      character: node.character |> resolve_edges(map),
+    }
+  end
+  def resolve_node(%{__struct__:  Genre} = node, map) do
+    %{node |
+      movies: node.movies |> resolve_edges(map),
+    }
+  end
+  def resolve_node(%{__struct__:  Character} = node, map) do
+    %{node |
+      performances: node.performances |> resolve_edges(map),
+    }
+  end
+#  def resolve_node(node, _map) do
+#    node
+#  end
 
   # resolve all edge alias-names, removes invalid edges
-  def resolve_edges(edges, map) do
+  def resolve_edges(edges, map) when is_list(edges) do
     edges
     |> Enum.map(fn edge -> Map.get(map, edge) end)
     |> Enum.reject(&is_nil/1)
+  end
+  def resolve_edges(edge, map) do
+    Map.get(map, edge)
   end
 end

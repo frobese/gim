@@ -157,6 +157,7 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edges(name, type, opts \\ []) do
+    #type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
     quote do
       Gim.Schema.__has_edges__(__MODULE__, unquote(name), unquote(type), unquote(reflect), unquote(opts))
@@ -218,6 +219,7 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edge(name, type, opts \\ []) do
+    #type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
     quote do
       Gim.Schema.__has_edge__(__MODULE__, unquote(name), unquote(type), unquote(reflect), unquote(opts))
@@ -307,4 +309,9 @@ defmodule Gim.Schema do
       nil -> :ok
     end
   end
+
+#  defp expand_alias({:__aliases__, _, _} = ast, env),
+#    do: Macro.expand(ast, %{env | function: {:__schema__, 2}})
+#  defp expand_alias(ast, _env),
+#    do: ast
 end

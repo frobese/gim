@@ -21,13 +21,22 @@ defmodule Gim.Repo.Table do
       defstruct [:nodes] ++ uindexes ++ nindexes
       alias __MODULE__, as: Table
 
+      table_aliases = Enum.into([:nodes | indexes], %{}, fn x ->
+        {x, Module.concat(__MODULE__, x)}
+      end)
+      @table_aliases table_aliases
+
+      def names() do
+        @table_aliases # TODO: should :ets.whereis/1
+      end
+
       def new() do
         table = %Table{}
 
         table = Enum.reduce(unquote(indexes), table, fn index, table ->
           itab_name = Module.concat(__MODULE__, index)
           itab = case :ets.whereis(itab_name) do
-            :undefined  -> :ets.new(itab_name, [:named_table, :duplicate_bag]) |> :ets.whereis()
+            :undefined  -> :ets.new(itab_name, [:public, :named_table, :duplicate_bag]) |> :ets.whereis()
             ref -> ref
           end
           %{table | index => itab}
@@ -35,7 +44,7 @@ defmodule Gim.Repo.Table do
 
         tab_name = Module.concat(__MODULE__, :nodes)
         tab = case :ets.whereis(tab_name) do
-          :undefined  -> :ets.new(tab_name, [:named_table, :set]) |> :ets.whereis()
+          :undefined  -> :ets.new(tab_name, [:public, :named_table, :set]) |> :ets.whereis()
           ref -> ref
         end
 
@@ -50,16 +59,33 @@ defmodule Gim.Repo.Table do
         end
       end
 
-      def all(%Table{nodes: tab} = _table) do
+      def all() do
+        tab = Module.concat(__MODULE__, :nodes)
         :ets.foldl(fn {_id, value} -> value end, [], tab)
       end
 
-      def fetch!(%Table{nodes: tab} = _table, id) when is_list(id) do
+      def all(%{nodes: tab} = _table) do
+        :ets.foldl(fn {_id, value} -> value end, [], tab)
+      end
+
+      def fetch!(id) when is_list(id) do
+        tab = Module.concat(__MODULE__, :nodes)
         Enum.map(id, &:ets.lookup_element(tab, &1, 2))
       end
-      def fetch!(%Table{nodes: tab} = _table, id) do
+      def fetch!(id) do
+        tab = Module.concat(__MODULE__, :nodes)
         :ets.lookup_element(tab, id, 2)
       end
+
+      def fetch!(%{nodes: tab} = _table, id) when is_list(id) do
+        Enum.map(id, &:ets.lookup_element(tab, &1, 2))
+      end
+      def fetch!(%{nodes: tab} = _table, id) do
+        :ets.lookup_element(tab, id, 2)
+      end
+#      def fetch(%Table{nodes: nodes} = _table, id) do
+#        Map.fetch(nodes, id)
+#      end
 
       def get_by(%Table{nodes: nodes} = table, key, value) do
         nodes
@@ -71,12 +97,24 @@ defmodule Gim.Repo.Table do
       end
 
       for index <- uindexes do
+        def get(unquote(index), value) do
+          itab = Module.concat(__MODULE__, unquote(index))
+          tab = Module.concat(__MODULE__, :nodes)
+          lookup_element(itab, value)
+          |> Enum.map(&:ets.lookup_element(tab, &1, 2))
+        end
         def get(%Table{:nodes => tab, unquote(index) => itab} = _table, unquote(index), value) do
           lookup_element(itab, value)
           |> Enum.map(&:ets.lookup_element(tab, &1, 2))
         end
       end
       for index <- nindexes do
+        def get(unquote(index), value) do
+          itab = Module.concat(__MODULE__, unquote(index))
+          tab = Module.concat(__MODULE__, :nodes)
+          lookup_element(itab, value)
+          |> Enum.map(&:ets.lookup_element(tab, &1, 2))
+        end
         def get(%Table{:nodes => tab, unquote(index) => itab} = _table, unquote(index), value) do
           lookup_element(itab, value)
           |> Enum.map(&:ets.lookup_element(tab, &1, 2))
@@ -86,7 +124,10 @@ defmodule Gim.Repo.Table do
         nil # no such index
       end
 
-      def insert(%Table{nodes: tab} = table, %{__id__: nil} = node) do
+      def insert(node) do
+        insert(@table_aliases, node)
+      end
+      def insert(%{nodes: tab} = table, %{__id__: nil} = node) do
         # assign automatic id
         id = :ets.update_counter(tab, :__autoid__, 1, {nil, 0})
         node = Map.put(node, :__id__, id)
@@ -108,14 +149,17 @@ defmodule Gim.Repo.Table do
         :ets.insert(tab, {id, node})
         node
       end
-      def insert(%Table{} = _table, %{__id__: _} = _node) do
+      def insert(%{} = _table, %{__id__: _} = _node) do
         raise "Can't insert existing node"
       end
 
-      def update(%Table{} = _table, %{__id__: nil} = _node) do
+      def update(node) do
+        update(@table_aliases, node)
+      end
+      def update(%{} = _table, %{__id__: nil} = _node) do
         raise "Can't update new node"
       end
-      def update(%Table{nodes: tab} = table, %{__id__: id} = node) do
+      def update(%{nodes: tab} = table, %{__id__: id} = node) do
         # fetch the stored node to get the currently indexed attributes
         oldnode = :ets.lookup_element(tab, id, 2)
 
@@ -140,10 +184,13 @@ defmodule Gim.Repo.Table do
         :ok
       end
 
-      def delete(%Table{} = _table, %{__id__: nil} = _node) do
+      def delete(node) do
+        delete(@table_aliases, node)
+      end
+      def delete(%{} = _table, %{__id__: nil} = _node) do
         raise "Can't delete new node"
       end
-      def delete(%Table{nodes: tab} = table, %{__id__: id} = _node) do
+      def delete(%{nodes: tab} = table, %{__id__: id} = _node) do
         # fetch the stored node to ensure we have the actual indexed attributes
         node = :ets.lookup_element(tab, id, 2)
 

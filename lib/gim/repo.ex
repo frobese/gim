@@ -56,6 +56,11 @@ defmodule Gim.Repo do
       # Server
 
       @impl true
+      def handle_call({:state}, _from, state) do
+        {:reply, state, state}
+      end
+
+      @impl true
       def handle_call({:all}, _from, state) do
         nodes = for type <- unquote(types) do
           ref = Module.concat(__MODULE__, type)
@@ -200,6 +205,15 @@ defmodule Gim.Repo do
 
       # Reflect edges
 
+      def reflect_assocs(node) do
+        tables = unquote(types) |> Enum.into(%{}, fn type ->
+          ref = Module.concat(__MODULE__, type)
+          {type, ref.names()}
+        end)
+
+        reflect_assocs(tables, node)
+      end
+
       def reflect_assocs(tables, %{__struct__: struct} = node) do
         assocs = struct.__schema__(:associations)
         Enum.each(assocs, fn assoc ->
@@ -212,23 +226,32 @@ defmodule Gim.Repo do
           nil -> :ok
           reflect ->
             type = struct.__schema__(:type, assoc)
+#            IO.puts("Map.fetch(tables, type) #{inspect(type)} : #{inspect(Map.fetch(tables, type))}")
             {:ok, table} = Map.fetch(tables, type)
             targets = Map.fetch!(node, assoc)
-            reflect_edge(table, reflect, id, targets)
+            reflect_edge(type, table, reflect, id, targets)
         end
       end
 
-      def reflect_edge(table, reflect, id, list) when is_list(list) do
+      def reflect_edge(type, table, reflect, id, list) when is_list(list) do
         Enum.each(list, fn target ->
-          reflect_edge(table, reflect, id, target)
+          reflect_edge(type, table, reflect, id, target)
         end)
       end
-      def reflect_edge(_table, _reflect, _id, nil) do
+      def reflect_edge(_type, _table, _reflect, _id, nil) do
         :ok # unset single edge
       end
       for type <- types do
         ref = Module.concat(__MODULE__, type)
-        def reflect_edge(%{__struct__: unquote(ref)} = table, reflect, id, target) do
+        def reflect_edge(unquote(type), table, reflect, id, target) do
+#          case unquote(ref).fetch(table, target) do
+#            {:ok, node} ->
+#              node = put_edge(node, reflect, id)
+#              unquote(ref).update(table, node)
+#            _ ->
+#              IO.puts("Missing node #{inspect unquote(ref)} #{inspect target} on reflect #{inspect reflect}, id #{inspect id}")
+#              table
+#          end
           node = unquote(ref).fetch!(table, target)
           node = put_edge(node, reflect, id)
           unquote(ref).update(table, node)
@@ -307,7 +330,10 @@ defmodule Gim.Repo do
       Always returns a list.
       """
       def get(type, key, value) do
-        GenServer.call(__MODULE__, {:get, type, key, value})
+        #GenServer.call(__MODULE__, {:get, type, key, value})
+        # -or-
+        ref = Module.concat(__MODULE__, type)
+        ref.get(key, value)
       end
 
       @doc """
@@ -334,13 +360,37 @@ defmodule Gim.Repo do
         end
       end
 
-      def create(%{__struct__: struct} = node, opts \\ []) do
+      for type <- types do
+        ref = Module.concat(__MODULE__, type)
+        assocs = type.__schema__(:associations)
+
+        def create(%{unquote(type) => tables}, %{__struct__: unquote(type)} = node) do
+          # remove all edges
+          naked = Enum.reduce(unquote(assocs), node, fn assoc, node ->
+            clear_edges(node, assoc)
+          end)
+          naked = %{naked | __repo__: __MODULE__}
+          %{__id__: id, __repo__: repo} = unquote(ref).insert(naked)
+
+          %{node | __id__: id, __repo__: repo}
+        end
+      end
+
+      def create(%{__struct__: struct} = node) do
         assocs = struct.__schema__(:associations)
         # remove all edges
         naked = Enum.reduce(assocs, node, fn assoc, node ->
           clear_edges(node, assoc)
         end)
         %{__id__: id, __repo__: repo} = GenServer.call(__MODULE__, {:insert, naked})
+        # -or-
+#        ref = Module.concat(__MODULE__, struct)
+#        naked = %{naked | __repo__: __MODULE__}
+#        %{__id__: id, __repo__: repo} = naked = ref.insert(naked)
+#
+#        #state = GenServer.call(__MODULE__, {:state})
+#        #reflect_assocs(state, naked)
+
         %{node | __id__: id, __repo__: repo}
       end
 
@@ -377,12 +427,26 @@ defmodule Gim.Repo do
       @doc """
       Update a node by replacing the attributes and merging the edges.
       """
-      def merge(node, opts \\ []) do
-        GenServer.call(__MODULE__, {:merge, node})
+      for type <- types do
+        ref = Module.concat(__MODULE__, type)
+
+        def merge(%{unquote(type) => tables}, %{__struct__: unquote(type), __id__: id} = node) do
+          old = unquote(ref).fetch!(tables, id)
+          node = node_merge(old, node)
+          unquote(ref).update(tables, node)
+        end
       end
 
-      def merge!(node, opts \\ []) do
-        case merge(node, opts) do
+      def merge(node) do
+        GenServer.call(__MODULE__, {:merge, node})
+        # -or-
+#        state = GenServer.call(__MODULE__, {:state})
+#        merge(state, node)
+#        reflect_assocs(state, node)
+      end
+
+      def merge!(node) do
+        case merge(node) do
           {:ok, res} -> res
           x -> raise Gim.NoNodeError, "No such Node #{inspect x}"
         end
@@ -432,15 +496,20 @@ defmodule Gim.Repo do
       # Opts are errors: :raise|:warn|:ignore
       def import(nodes, opts \\ []) do
         errors = opts |> Keyword.get(:errors, :raise)
+        state = GenServer.call(__MODULE__, {:state})
         # 1st pass: Create (insert)
         nodes =
           nodes
-          |> Enum.map(fn {k, n} -> {k, create(n)} end)
+          |> Enum.map(fn {k, n} -> {k, create(state, n)} end)
           |> Enum.into(%{})
         # 2nd pass: Resolve (merge)
         nodes
           |> Enum.map(fn {k, n} -> resolve_node(n, nodes, errors) end)
-          |> Enum.map(fn n -> merge(n) end)
+          |> Enum.map(fn n ->
+#            merge(n)
+             merge(state, n)
+             reflect_assocs(state, n)
+          end)
       end
 
       # Export helper
