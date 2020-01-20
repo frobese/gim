@@ -12,25 +12,53 @@ defmodule Gim.Repo.Table do
 
     quote bind_quoted: [type: type, uindexes: uindexes, nindexes: nindexes] do
       indexes = uindexes ++ nindexes
-      indexes_def = Enum.map(indexes, fn x -> {x, %{}} end)
 
       def type(), do: unquote(type)
       def uindexes(), do: unquote(uindexes)
       def nindexes(), do: unquote(nindexes)
       def indexes(), do: unquote(indexes)
 
-      defstruct [autoid: 0, nodes: %{}] ++ indexes_def
+      defstruct [:nodes] ++ uindexes ++ nindexes
       alias __MODULE__, as: Table
 
-      def all(%Table{nodes: nodes} = _table) do
-        nodes |> Map.values()
+      def new() do
+        table = %Table{}
+
+        table = Enum.reduce(unquote(indexes), table, fn index, table ->
+          itab_name = Module.concat(__MODULE__, index)
+          itab = case :ets.whereis(itab_name) do
+            :undefined  -> :ets.new(itab_name, [:named_table, :duplicate_bag]) |> :ets.whereis()
+            ref -> ref
+          end
+          %{table | index => itab}
+        end)
+
+        tab_name = Module.concat(__MODULE__, :nodes)
+        tab = case :ets.whereis(tab_name) do
+          :undefined  -> :ets.new(tab_name, [:named_table, :set]) |> :ets.whereis()
+          ref -> ref
+        end
+
+        %{table | nodes: tab}
       end
 
-      def fetch!(%Table{nodes: nodes} = _table, id) when is_list(id) do
-        Enum.map(id, &Map.fetch!(nodes, &1))
+      defp lookup_element(tab, key) do
+        try do
+          :ets.lookup_element(tab, key, 2)
+        rescue
+          ArgumentError -> []
+        end
       end
-      def fetch!(%Table{nodes: nodes} = _table, id) do
-        Map.fetch!(nodes, id)
+
+      def all(%Table{nodes: tab} = _table) do
+        :ets.foldl(fn {_id, value} -> value end, [], tab)
+      end
+
+      def fetch!(%Table{nodes: tab} = _table, id) when is_list(id) do
+        Enum.map(id, &:ets.lookup_element(tab, &1, 2))
+      end
+      def fetch!(%Table{nodes: tab} = _table, id) do
+        :ets.lookup_element(tab, id, 2)
       end
 
       def get_by(%Table{nodes: nodes} = table, key, value) do
@@ -43,47 +71,42 @@ defmodule Gim.Repo.Table do
       end
 
       for index <- uindexes do
-        def get(%Table{:nodes => nodes, unquote(index) => index} = _table, unquote(index), value) do
-          case Map.get(index, value) do
-            nil -> []
-            x -> [Map.fetch!(nodes, x)]
-          end
+        def get(%Table{:nodes => tab, unquote(index) => itab} = _table, unquote(index), value) do
+          lookup_element(itab, value)
+          |> Enum.map(&:ets.lookup_element(tab, &1, 2))
         end
       end
       for index <- nindexes do
-        def get(%Table{:nodes => nodes, unquote(index) => index} = _table, unquote(index), value) do
-          index
-          |> Map.get(value, [])
-          |> Enum.map(&Map.fetch!(nodes, &1))
+        def get(%Table{:nodes => tab, unquote(index) => itab} = _table, unquote(index), value) do
+          lookup_element(itab, value)
+          |> Enum.map(&:ets.lookup_element(tab, &1, 2))
         end
       end
       def get(_table, _index, _value) do
         nil # no such index
       end
 
-      def insert(%Table{autoid: autoid, nodes: nodes} = table, %{__id__: nil} = node) do
+      def insert(%Table{nodes: tab} = table, %{__id__: nil} = node) do
         # assign automatic id
-        {autoid, id} = {autoid + 1, autoid}
+        id = :ets.update_counter(tab, :__autoid__, 1, {nil, 0})
         node = Map.put(node, :__id__, id)
 
         # update the indexes
-        table = Enum.reduce(unquote(uindexes), table, fn index, table ->
+        Enum.map(unquote(uindexes), fn index ->
           %{^index => attr} = node
-          %{^index => newindex} = table
+          %{^index => itab} = table
           # TODO: error on dup: Map.get(newindex, attr) != nil
-          newindex = Map.put(newindex, attr, id)
-          %{table | index => newindex}
+          :ets.insert(itab, {attr, id})
         end)
-        table = Enum.reduce(unquote(nindexes), table, fn index, table ->
+        Enum.map(unquote(nindexes), fn index ->
           %{^index => attr} = node
-          %{^index => newindex} = table
-          newindex = Map.update(newindex, attr, [id], fn x -> [id | x] end)
-          %{table | index => newindex}
+          %{^index => itab} = table
+          :ets.insert(itab, {attr, id})
         end)
 
         # actually insert the node
-        nodes = Map.put(nodes, id, node)
-        {%{table | autoid: autoid, nodes: nodes}, node}
+        :ets.insert(tab, {id, node})
+        node
       end
       def insert(%Table{} = _table, %{__id__: _} = _node) do
         raise "Can't insert existing node"
@@ -92,57 +115,53 @@ defmodule Gim.Repo.Table do
       def update(%Table{} = _table, %{__id__: nil} = _node) do
         raise "Can't update new node"
       end
-      def update(%Table{nodes: nodes} = table, %{__id__: id} = node) do
+      def update(%Table{nodes: tab} = table, %{__id__: id} = node) do
         # fetch the stored node to get the currently indexed attributes
-        oldnode = Map.fetch!(nodes, id)
+        oldnode = :ets.lookup_element(tab, id, 2)
 
         # update the indexes
-        table = Enum.reduce(unquote(uindexes), table, fn index, table ->
+        Enum.map(unquote(uindexes), fn index ->
           %{^index => oldattr} = oldnode
           %{^index => attr} = node
-          %{^index => newindex} = table
-          newindex = Map.delete(newindex, oldattr)
-          newindex = Map.put(newindex, attr, id)
-          %{table | index => newindex}
+          %{^index => itab} = table
+          :ets.delete_object(itab, {oldattr, id})
+          :ets.insert(itab, {attr, id})
         end)
-        table = Enum.reduce(unquote(nindexes), table, fn index, table ->
+        Enum.map(unquote(nindexes), fn index ->
           %{^index => oldattr} = oldnode
           %{^index => attr} = node
-          %{^index => newindex} = table
-          newindex = Map.update!(newindex, oldattr, fn x -> List.delete(x, id) end)
-          newindex = Map.update(newindex, attr, [id], fn x -> [id | x] end)
-          %{table | index => newindex}
+          %{^index => itab} = table
+          :ets.delete_object(itab, {oldattr, id})
+          :ets.insert(itab, {attr, id})
         end)
 
         # actually update the node
-        nodes = Map.put(nodes, id, node)
-        %{table | nodes: nodes}
+        :ets.insert(tab, {id, node}) # replace node
+        :ok
       end
 
       def delete(%Table{} = _table, %{__id__: nil} = _node) do
         raise "Can't delete new node"
       end
-      def delete(%Table{nodes: nodes} = table, %{__id__: id} = _node) do
+      def delete(%Table{nodes: tab} = table, %{__id__: id} = _node) do
         # fetch the stored node to ensure we have the actual indexed attributes
-        node = Map.fetch!(nodes, id)
+        node = :ets.lookup_element(tab, id, 2)
 
         # update the indexes
-        table = Enum.reduce(unquote(uindexes), table, fn index, table ->
+        Enum.map(unquote(uindexes), fn index ->
           %{^index => attr} = node
-          %{^index => newindex} = table
-          newindex = Map.delete(newindex, attr)
-          %{table | index => newindex}
+          %{^index => itab} = table
+          :ets.delete_object(itab, {attr, id})
         end)
-        table = Enum.reduce(unquote(nindexes), table, fn index, table ->
+        Enum.map(unquote(nindexes), fn index ->
           %{^index => attr} = node
-          %{^index => newindex} = table
-          newindex = Map.update!(newindex, attr, fn x -> List.delete(x, id) end)
-          %{table | index => newindex}
+          %{^index => itab} = table
+          :ets.delete_object(itab, {attr, id})
         end)
 
         # actually delete the node
-        nodes = Map.delete(nodes, id)
-        %{table | nodes: nodes}
+        :ets.delete(tab, id)
+        :ok
       end
 
     end

@@ -47,7 +47,7 @@ defmodule Gim.Repo do
       def init(_args) do
         tables = Enum.into(unquote(types), %{}, fn type ->
           ref = Module.concat(__MODULE__, type)
-          {type, struct(ref, %{})}
+          {type, ref.new()}
         end)
 
         {:ok, struct(State, tables)}
@@ -100,39 +100,35 @@ defmodule Gim.Repo do
         @impl true
         def handle_call({:insert, %{__struct__: unquote(type)} = node}, _from, %{unquote(type) => table} = state) do
           node = %{node | __repo__: __MODULE__}
-          {table, node} = unquote(ref).insert(table, node)
-          tables = %{state | unquote(type) => table}
+          node = unquote(ref).insert(table, node)
 
-          tables = reflect_assocs(tables, node)
-          {:reply, node, tables}
+          reflect_assocs(state, node)
+          {:reply, node, state}
         end
 
         @impl true
         def handle_cast({:update, %{__struct__: unquote(type)} = node}, %{unquote(type) => table} = state) do
-          table = unquote(ref).update(table, node)
-          tables = %{state | unquote(type) => table}
+          unquote(ref).update(table, node)
 
-          tables = reflect_assocs(tables, node)
-          {:noreply, tables}
+          reflect_assocs(state, node)
+          {:noreply, state}
         end
 
         @impl true
         def handle_call({:merge, %{__struct__: unquote(type), __id__: id} = node}, _from, %{unquote(type) => table} = state) do
           old = unquote(ref).fetch!(table, id)
           node = node_merge(old, node)
-          table = unquote(ref).update(table, node)
-          tables = %{state | unquote(type) => table}
+          unquote(ref).update(table, node)
 
-          tables = reflect_assocs(tables, node)
-          {:reply, node, tables}
+          reflect_assocs(state, node)
+          {:reply, node, state}
         end
 
         @impl true
         def handle_cast({:delete, %{__struct__: unquote(type), __id__: _id} = node}, %{unquote(type) => table} = state) do
-          table = unquote(ref).delete(table, node)
-          tables = %{state | unquote(type) => table}
+          unquote(ref).delete(table, node)
 
-          {:noreply, tables}
+          {:noreply, state}
         end
       end
 
@@ -206,30 +202,29 @@ defmodule Gim.Repo do
 
       def reflect_assocs(tables, %{__struct__: struct} = node) do
         assocs = struct.__schema__(:associations)
-        Enum.reduce(assocs, tables, fn assoc, tables ->
+        Enum.each(assocs, fn assoc ->
           reflect_assoc(tables, node, assoc)
         end)
       end
 
       def reflect_assoc(tables, %{__struct__: struct, __id__: id} = node, assoc) do
         case struct.__schema__(:association, assoc) do
-          nil -> tables
+          nil -> :ok
           reflect ->
             type = struct.__schema__(:type, assoc)
             {:ok, table} = Map.fetch(tables, type)
             targets = Map.fetch!(node, assoc)
-            table = reflect_edge(table, reflect, id, targets)
-            %{tables | type => table}
+            reflect_edge(table, reflect, id, targets)
         end
       end
 
       def reflect_edge(table, reflect, id, list) when is_list(list) do
-        Enum.reduce(list, table, fn target, table ->
+        Enum.each(list, fn target ->
           reflect_edge(table, reflect, id, target)
         end)
       end
-      def reflect_edge(table, _reflect, _id, nil) do
-        table # unset single edge
+      def reflect_edge(_table, _reflect, _id, nil) do
+        :ok # unset single edge
       end
       for type <- types do
         ref = Module.concat(__MODULE__, type)
