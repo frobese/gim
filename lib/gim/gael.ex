@@ -121,7 +121,7 @@ defmodule Gael do
   # :name, :"performance.actor", :"performance.character", :"performance.film",
   # :starring
 
-  defp collect(:empty, edges), do: edges
+  defp collect(:blank, edges), do: edges
   defp collect({:comment, _}, edges), do: edges
   defp collect({subject, predicate, object}, edges) do
     Map.update(edges, predicate, %{subject => [object]}, fn map ->

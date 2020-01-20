@@ -22,7 +22,7 @@ defmodule GraphDemo.Movies.Repo do
     # resolve or create genre, director, starring
     genre = genre |> as_list |> Enum.map(&get_or_create(Movies.Genre, &1))
     director = director |> as_list |> Enum.map(&get_or_create(Movies.Person, &1))
-    starring = starring |> as_list |> Enum.map(&get_or_create(Movies.Person, &1))
+    starring = starring |> as_list |> Enum.map(&get_or_create(Movies.Performance, &1))
 
     # insert movie
     %Movies.Movie{ name: name, initial_release_date: initial_release_date }

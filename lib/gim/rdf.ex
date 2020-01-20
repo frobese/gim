@@ -27,7 +27,7 @@ defmodule Gim.Rdf do
 
   # Raw RDF token to RDF map
 
-  defp rdf_to_map(:empty, acc), do: acc
+  defp rdf_to_map(:blank, acc), do: acc
   defp rdf_to_map({:comment, _}, acc), do: acc
   defp rdf_to_map({subject, predicate, object}, acc) do
     Map.update(acc, subject, [{predicate, object}], fn x ->
@@ -37,9 +37,9 @@ defmodule Gim.Rdf do
 
   # Tokenize RDF string data
 
-  defp tokenize(_pfun, <<>>), do: :empty
-  defp tokenize(_pfun, <<"\n">>), do: :empty
-  defp tokenize(_pfun, <<"\r\n">>), do: :empty
+  defp tokenize(_pfun, <<>>), do: :blank
+  defp tokenize(_pfun, <<"\n">>), do: :blank
+  defp tokenize(_pfun, <<"\r\n">>), do: :blank
   defp tokenize(pfun, <<" ", rest::binary>>), do: tokenize(pfun, rest)
   defp tokenize(pfun, <<"\t", rest::binary>>), do: tokenize(pfun, rest)
   defp tokenize(_pfun, <<"#", rest::binary>>), do: tokenize_comment(rest)

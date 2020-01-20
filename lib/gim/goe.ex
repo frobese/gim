@@ -153,7 +153,7 @@ defmodule Goe do
   # :name, :"performance.actor", :"performance.character", :"performance.film",
   # :starring
 
-  defp collect(:empty, tabs), do: tabs
+  defp collect(:blank, tabs), do: tabs
   defp collect({:comment, _}, tabs), do: tabs
   defp collect({subject, predicate, object}, tabs) do
     {tabs, tab} = case Map.get(tabs, predicate) do
