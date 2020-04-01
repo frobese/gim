@@ -10,6 +10,7 @@ defmodule GimTest do
     # {:ok, pid: pid}
   end
 
+  @tag movies: true
   test "all" do
     Movies.Repo.all(Movies.Movie)
   end
