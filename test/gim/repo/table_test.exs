@@ -4,7 +4,7 @@ defmodule GimTest.TableTest do
   alias Gim.Repo.Table
   alias GimTest.Animal
 
-  for module <- [Table.Ets, Table.LegacyEts] do
+  for module <- [Table.Ets] do
     mod_name = Module.concat(__MODULE__, module)
 
     defmodule mod_name do
@@ -26,30 +26,66 @@ defmodule GimTest.TableTest do
 
         @tag table: true
         test "all", %{module: module, table: table} do
-          assert 473 == length(module.all(table))
+          assert {:ok, animals} = module.query(table, nil, [])
+          assert 473 == length(animals)
         end
 
         @tag table: true
         test "fetch", %{module: module, table: table} do
-          assert [%Animal{impound_no: "K12-000416"}] =
-                   module.get(table, :impound_no, "K12-000416")
+          assert {:ok, [%Animal{impound_no: "K12-000416"}]} =
+                   module.query(table, nil, impound_no: "K12-000416")
         end
 
         @tag table: true
-        test "dogs and cats", %{module: module, table: table} do
-          dogs = module.get(table, :animal_type, "Dog")
+        test "simple queries", %{module: module, table: table} do
+          {:ok, dogs} = module.query(table, nil, animal_type: "Dog")
 
           for dog <- dogs do
             assert dog.animal_type == "Dog"
           end
 
-          cats = module.get(table, :animal_type, "Cat")
+          {:ok, cats} = module.query(table, nil, animal_type: "Cat")
 
           for cat <- cats do
             assert cat.animal_type == "Cat"
           end
 
+          {:ok, cats_and_dogs} =
+            module.query(table, nil, {:or, [animal_type: "Cat", animal_type: "Dog"]})
+
+          {:ok, male_dogs_and_female_cats} =
+            module.query(
+              table,
+              nil,
+              {:or,
+               [
+                 {:and, [animal_type: "Cat", sex: :female]},
+                 {:and, [animal_type: "Dog", sex: :male]}
+               ]}
+            )
+
+            for animal <- male_dogs_and_female_cats do
+              assert (animal.animal_type == "Cat" and animal.sex == :female) or (animal.animal_type == "Dog" and animal.sex == :male)
+            end
+
+          {:ok, female_dogs_and_male_cats} =
+            module.query(
+              table,
+              nil,
+              {:or,
+               [
+                 {:and, [animal_type: "Cat", sex: :male]},
+                 {:and, [animal_type: "Dog", sex: :female]}
+               ]}
+            )
+
+            for animal <- female_dogs_and_male_cats do
+              assert (animal.animal_type == "Dog" and animal.sex == :female) or (animal.animal_type == "Cat" and animal.sex == :male)
+            end
+
           assert 473 == length(dogs) + length(cats)
+          assert 473 == length(male_dogs_and_female_cats) + length(female_dogs_and_male_cats)
+          assert 473 == length(cats_and_dogs)
         end
       end
     end

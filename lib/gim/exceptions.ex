@@ -32,3 +32,10 @@ defmodule Gim.UnknownEdgeError do
   """
   defexception [:message]
 end
+
+defmodule Gim.NoIndexError do
+  @moduledoc """
+  Raised at runtime when a query tries to filter an unindexed property.
+  """
+  defexception [:message]
+end

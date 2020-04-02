@@ -6,6 +6,7 @@ defmodule Gim.Repo.Table.Ets do
   #   :nindexes,
   #   :table
   # ]
+  import Gim.Repo.Index
 
   def new(reference, type) do
     uindexes = type.__schema__(:indexes_unique)
@@ -89,51 +90,46 @@ defmodule Gim.Repo.Table.Ets do
   def query(table, ids, filter)
 
   def query(%{nodes: nodes}, nil, []) do
-    :ets.foldl(fn {_id, value}, acc -> [value | acc] end, [], nodes)
+    {:ok, :ets.foldl(fn {_id, value}, acc -> [value | acc] end, [], nodes)}
+  end
+
+  def query(_, [], _) do
+    {:ok, []}
   end
 
   def query(%{nodes: nodes}, ids, []) when is_list(ids) do
-    Enum.map(ids, &:ets.lookup_element(nodes, &1, 2))
+    nodes = Enum.reduce(ids, [], fn id, acc ->
+      case :ets.lookup(nodes, id) do
+        [{_, elem}] -> [elem | acc]
+        [] -> acc
+      end
+    end)
 
-    # :ets.foldl(fn {id, value}, acc -> if(id in ids, do: [value | acc], else: acc) end, [], nodes)
+    {:ok, nodes}
   end
 
   def query(table, nil, filter) do
-    query(table, filter(table, filter), [])
+    case filter(table, filter) do
+      {:ok, ids} ->
+        query(table, ids, [])
+      err -> err
+    end
   end
 
-  ### Legacy Api
-  def all(table) do
-    query(table, nil, [])
-  end
-
-  def fetch(table, id) do
-    table
-    |> query([id], [])
-    |> List.first()
-  end
-
-  def fetch!(table, id) do
-    table
-    |> query([id], [])
-    |> List.first()
-  end
-
-  def get_by(table, field, value) do
-    query(table, nil, [{field, value}])
-  end
-
-  def get(table, field, value) do
-    query(table, nil, [{field, value}])
+  def query(table, ids, filter) when is_list(ids) or is_nil(ids) do
+    case filter(table, filter) do
+      {:ok, filter_ids} ->
+        query(table, intersect(new(ids), filter_ids), [])
+      err -> err
+    end
   end
 
   ### Helper
-
   defp index_add(%{__uindexes__: uidx, __nindexes__: nidx} = table, %{__id__: id} = node) do
     Enum.each(uidx, fn index ->
       %{^index => attr} = node
       %{^index => itab} = table
-      :ets.insert(itab, {attr, id})
+      :ets.insert(itab, {attr, [id]})
     end)
 
     Enum.each(nidx, fn index ->
@@ -143,7 +139,7 @@ defmodule Gim.Repo.Table.Ets do
       index =
         case :ets.lookup(itab, attr) do
           [] -> [id]
-          [{_, ids}] -> Enum.sort([id | ids])
+          [{_, ids}] -> add(ids, id)
         end
 
       :ets.insert(itab, {attr, index})
@@ -166,7 +162,7 @@ defmodule Gim.Repo.Table.Ets do
           :ets.delete(itab, attr)
 
         [{_, ids}] ->
-          :ets.insert(itab, {attr, List.delete(ids, id)})
+          :ets.insert(itab, {attr, remove(ids, id)})
 
         [] ->
           []
@@ -175,7 +171,7 @@ defmodule Gim.Repo.Table.Ets do
   end
 
   defp index_lookup(table, index, attr) do
-    %{^index => itab} = table
+    itab = Map.fetch!(table, index)
 
     case :ets.lookup(itab, attr) do
       [{_attr, ids}] -> ids
@@ -183,15 +179,40 @@ defmodule Gim.Repo.Table.Ets do
     end
   end
 
-  defp filter(table, filter, acc \\ [])
-
-  defp filter(table, [{field, value} | filter], acc) do
-    ids = List.wrap(index_lookup(table, field, value))
-
-    filter(table, filter, ids ++ acc)
+  defp filter(table, filter) do
+    {:ok, filter!(table, filter)}
+  rescue
+    e in Gim.NoIndexError -> {:error, e}
   end
 
-  defp filter(_table, [], acc) do
-    Enum.uniq(acc)
+  defp filter!(table, {:or, filter}) do
+    Enum.reduce(filter, [], fn filter, acc ->
+      join(filter!(table, filter), acc)
+    end)
+  end
+
+  defp filter!(table, {:and, filter}) do
+    Enum.reduce_while(filter, nil, fn filter, acc ->
+      case acc do
+        [] -> {:halt, []}
+        nil -> {:cont, filter!(table, filter)}
+        acc -> {:cont, intersect(filter!(table, filter), acc)}
+      end
+    end)
+  end
+
+  defp filter!(_table, {:__id__, id}) do
+    [id]
+  end
+
+  defp filter!(table, {field, value}) do
+    index_lookup(table, field, value)
+  rescue
+    KeyError ->
+      raise Gim.NoIndexError, "Unable to filter #{inspect(field)} in #{inspect(table.__type__)} by #{inspect(value)}"
+  end
+
+  defp filter!(table, filter) when is_list(filter) do
+    filter!(table, {:and, filter})
   end
 end

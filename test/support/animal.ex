@@ -51,10 +51,10 @@ defmodule GimTest.Animal do
   schema do
     property(:impound_no, index: :primary)
     property(:intake_date)
-    property(:intake_type)
+    property(:intake_type, index: true)
     property(:animal_type, index: true)
     property(:neutered_status)
-    property(:sex)
+    property(:sex, index: true)
     property(:age_intake)
     property(:condition)
     property(:breed)

@@ -23,6 +23,8 @@ defmodule Gim.Repo do
     quote bind_quoted: [types: types] do
       use GenServer
 
+      alias Gim.Query
+
       # for type <- types do
       #   ref = Module.concat(__MODULE__, type)
       #   uindexes = type.__schema__(:indexes_unique)
@@ -32,6 +34,13 @@ defmodule Gim.Repo do
       #   end
 
       # end
+
+      for type <- types do
+        defguard is_type(type) when true
+      end
+
+      defguard is_type(_type) when false
+
 
       defmodule State do
         @moduledoc false
@@ -75,118 +84,67 @@ defmodule Gim.Repo do
         {:reply, nodes, state}
       end
 
-      for type <- types do
-        # ref = Module.concat(__MODULE__, type)
-
-        @impl true
-        def handle_call({:all, unquote(type)}, _from, %{unquote(type) => {_, module, table}} = state) do
-          nodes = {:ok, module.all(table)}
-
-          {:reply, nodes, state}
-        end
-
-        @impl true
-        def handle_call({:get_by, unquote(type), key, value}, _from, %{unquote(type) => {_, module, table}} = state) do
-          nodes = module.get_by(table, key, value)
-
-          {:reply, nodes, state}
-        end
-
-        @impl true
-        def handle_call({:get, unquote(type), key, value}, _from, %{unquote(type) => {_, module, table}} = state) do
-          nodes = module.get(table, key, value)
-
-          {:reply, nodes, state}
-        end
-
-        @impl true
-        def handle_call({:fetch, unquote(type), id}, _from, %{unquote(type) => {_, module, table}} = state) do
-          node = module.fetch!(table, id)
-
-          {:reply, node, state}
-        end
-
-        @impl true
-        def handle_call({:insert, %{__struct__: unquote(type)} = node}, _from, %{unquote(type) => {_, module, table}} = state) do
-          node = %{node | __repo__: __MODULE__}
-          node = module.insert(table, node)
-
-          reflect_assocs(state, node)
-          {:reply, node, state}
-        end
-
-        @impl true
-        def handle_cast({:update, %{__struct__: unquote(type)} = node}, %{unquote(type) => {_, module, table}} = state) do
-          module.update(table, node)
-
-          reflect_assocs(state, node)
-          {:noreply, state}
-        end
-
-        @impl true
-        def handle_call({:merge, %{__struct__: unquote(type), __id__: id} = node}, _from, %{unquote(type) => {_, module, table}} = state) do
-          old = module.fetch!(table, id)
-          node = node_merge(old, node)
-          module.update(table, node)
-
-          reflect_assocs(state, node)
-          {:reply, node, state}
-        end
-
-        @impl true
-        def handle_cast({:delete, %{__struct__: unquote(type), __id__: _id} = node}, %{unquote(type) => {_, module, table}} = state) do
-          module.delete(table, node)
-
-          {:noreply, state}
+      @impl true
+      def handle_call({:resolve, %Query{type: type, filter: filter}}, from, state) do
+        case Map.fetch(state, type) do
+          {:ok, {_, module, table}} ->
+            {:reply, module.query(table, nil, filter), state}
+          :error ->
+            {:reply, {:error, Gim.NoSuchTypeError}, state}
         end
       end
 
-      # fallbacks, we actually don't need these
+      def handle_call({:insert, %{__struct__: type} = node}, _from, state) do
+        case Map.fetch(state, type) do
+          {:ok, {_, module, table}} ->
+            node = %{node | __repo__: __MODULE__}
+            node = module.insert(table, node)
 
-      @impl true
-      def handle_call({:all, _type}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
+            reflect_assocs(state, node)
+            {:reply, node, state}
+          :error ->
+            {:reply, {:error, Gim.NoSuchTypeError}, state}
+        end
       end
 
       @impl true
-      def handle_call({:get_by, _type, _key, _value}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
+      def handle_cast({:update, %{__struct__: type} = node}, state) do
+        case Map.fetch(state, type) do
+          {:ok, {_, module, table}} ->
+            module.update(table, node)
+
+            reflect_assocs(state, node)
+            {:noreply, state}
+          :error ->
+            {:reply, {:error, Gim.NoSuchTypeError}, state}
+        end
       end
 
       @impl true
-      def handle_call({:get, _type, _key, _value}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
+      def handle_call({:merge, %{__struct__: type, __id__: id} = node}, _from, state) do
+        case Map.fetch(state, type) do
+          {:ok, {_, module, table}} ->
+            {:ok, [old]} = module.query(table, [id], [])
+            node = node_merge(old, node)
+            module.update(table, node)
+
+            reflect_assocs(state, node)
+            {:reply, node, state}
+          :error ->
+            {:reply, {:error, Gim.NoSuchTypeError}, state}
+        end
       end
 
       @impl true
-      def handle_call({:fetch, _type, _id}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
-      end
+      def handle_cast({:delete, %{__struct__: type, __id__: _id} = node}, state) do
+        case Map.fetch(state, type) do
+          {:ok, {_, module, table}} ->
+            module.delete(table, node)
 
-      @impl true
-      def handle_call({:insert, _node}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
-      end
-
-      @impl true
-      def handle_cast({:update, _node}, state) do
-        {:noreply, state}
-      end
-
-      @impl true
-      def handle_call({:merge, _node}, _from, state) do
-        err = {:error, Gim.NoSuchTypeError}
-        {:reply, err, state}
-      end
-
-      @impl true
-      def handle_cast({:delete, _node}, state) do
-        {:noreply, state}
+            {:noreply, state}
+          :error ->
+            {:reply, {:error, Gim.NoSuchTypeError}, state}
+        end
       end
 
       # Merge edges
@@ -256,7 +214,7 @@ defmodule Gim.Repo do
 #              IO.puts("Missing node #{inspect module} #{inspect target} on reflect #{inspect reflect}, id #{inspect id}")
 #              table
 #          end
-          node = module.fetch!(table, target)
+          {:ok, [node]} = module.query(table, [target], [])
           node = put_edge(node, reflect, id)
           module.update(table, node)
         end
@@ -287,30 +245,35 @@ defmodule Gim.Repo do
 
       # API
 
-      def types(opts \\ []) do
+
+      def types do
         unquote(types)
       end
 
-      def dump(opts \\ []) do
+      def dump do
         GenServer.call(__MODULE__, {:all})
       end
 
-      def all(type, opts \\ []) do
-        GenServer.call(__MODULE__, {:all, type})
+      defp resolve(%Gim.Query{type: type} = query) when is_type(type) do
+        GenServer.call(__MODULE__, {:resolve, query})
       end
 
-      def all!(type, opts \\ []) do
-        case all(type, opts) do
+      def all(type) when is_type(type) do
+        resolve(%Query{type: type})
+      end
+
+      def all!(type) when is_type(type) do
+        case all(type) do
           {:ok, res} -> res
-          _ -> raise Gim.NoSuchTypeError, "No such Type #{inspect type}"
+          {:error, exception} -> raise exception
         end
       end
 
       @doc """
       Get a node by a given edge, or list of nodes by given edges.
       """
-      def fetch!(type, id) do
-        GenServer.call(__MODULE__, {:fetch, type, id})
+      def fetch!(type, id) when is_type(type) do
+        fetch!(type, :__id__, id)
       end
 
       def fetch_or(type, id) do
@@ -325,19 +288,26 @@ defmodule Gim.Repo do
       Get all nodes of a given type with key==value.
       Always returns a list.
       """
-      def get_by(type, key, value) do
-        GenServer.call(__MODULE__, {:get_by, type, key, value})
+      def get_by(type, key, value) when is_type(type) do
+        case all(type) do
+          {:ok, res} ->
+            Enum.filter(res, fn
+              %{^key => ^value} -> true
+              _ -> false
+            end)
+          err -> err
+        end
       end
 
       @doc """
       Get all nodes of a given type by a given index value.
       Always returns a list.
       """
-      def get(type, key, value) do
-        #GenServer.call(__MODULE__, {:get, type, key, value})
-        # -or-
-        ref = Module.concat(__MODULE__, type)
-        ref.get(key, value)
+      def get(type, key, value) when is_type(type) do
+        case resolve(%Query{type: type, filter: [{key, value}]}) do
+          {:ok, nodes} -> nodes
+          {:error, error} -> raise error
+        end
       end
 
       @doc """
@@ -435,7 +405,7 @@ defmodule Gim.Repo do
         # ref = Module.concat(__MODULE__, type)
 
         def merge(%{unquote(type) => {_, module, table}}, %{__struct__: unquote(type), __id__: id} = node) do
-          old = module.fetch!(table, id)
+          {:ok, [old]} = module.query(table, [id], [])
           node = node_merge(old, node)
           module.update(table, node)
         end

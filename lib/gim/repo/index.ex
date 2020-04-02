@@ -3,6 +3,22 @@ defmodule Gim.Repo.Index do
   @type index :: list(id)
 
   @doc """
+  Turns a given list into an index
+
+      iex> new([10, 13, 6, 60, 2])
+      [60, 13, 10, 6, 2]
+
+      iex> new([2, 2, 2, 3])
+      [3, 2]
+  """
+  @spec new(list :: index) :: index
+  def new(list) do
+    list
+    |> Enum.uniq()
+    |> Enum.reverse()
+  end
+
+  @doc """
   Adds an id to the given index
 
       iex> add([], 42)
@@ -90,5 +106,48 @@ defmodule Gim.Repo.Index do
     lists
     |> Enum.sort()
     |> Enum.reduce(&intersect/2)
+  end
+
+  @doc """
+  Joins the given indexes
+
+      iex> join([99, 50, 13], [90, 50, 10])
+      [99, 90, 50, 13, 10]
+
+      iex> intersect([], [99, 70, 60, 50, 11, 10, 1, 0])
+      [99, 70, 60, 50, 11, 10, 1, 0]
+  """
+  @spec join(index_a :: index, index_b :: index) :: index
+  def join([head | rest_a], [head | rest_b]) do
+    [head | join(rest_a, rest_b)]
+  end
+
+  def join([head_a | rest_a], [head_b | _] = index_b) when head_a > head_b do
+    [head_a | join(rest_a, index_b)]
+  end
+
+  def join([head_a | _] = index_a, [head_b | rest_b]) when head_a < head_b do
+    [head_b | join(index_a, rest_b)]
+  end
+
+  def join([], rest) do
+    rest
+  end
+
+  def join(rest, []) do
+    rest
+  end
+
+  @doc """
+  Intersects a list of indexes
+
+      iex> intersect([[99, 55, 42, 11], [98, 54, 42, 10], [90, 50, 42]])
+      [99, 98, 90, 55 , 54, 50, 42, 11, 10]
+  """
+  @spec join(indexes :: list(index)) :: index
+  def join(lists) do
+    lists
+    |> Enum.sort()
+    |> Enum.reduce(&join/2)
   end
 end

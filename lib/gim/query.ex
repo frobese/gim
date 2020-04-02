@@ -4,7 +4,9 @@ defmodule Gim.Query do
 
   """
 
-  # Node operations
+  defstruct type: nil,
+            filter: {:and, []},
+            expand: []
 
   @doc """
   Returns the target nodes following the edges of given label for the given node.

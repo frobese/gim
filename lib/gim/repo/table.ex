@@ -12,12 +12,8 @@ defmodule Gim.Repo.Table do
   end
 
   @callback new(reference :: atom(), type :: atom()) :: map()
-  @callback all(table :: map()) :: list()
-  @callback fetch!(table :: map(), integer()) :: struct()
-  @callback fetch(table :: map(), integer()) :: struct()
-  @callback get(table :: map(), field :: atom(), value :: any()) :: list(struct())
-  @callback get_by(table :: map(), field :: atom(), value :: any()) :: list(struct())
   @callback insert(table :: map(), struct()) :: struct()
   @callback update(table :: map(), struct()) :: struct()
   @callback delete(table :: map(), struct()) :: :ok
+  @callback query(table :: map(), ids :: nil | list(pos_integer()), filter :: list()) :: {:ok, list(struct())} | {:error, Gim.NoIndexError}
 end
