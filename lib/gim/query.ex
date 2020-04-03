@@ -8,6 +8,88 @@ defmodule Gim.Query do
             filter: {:and, []},
             expand: []
 
+  import Gim.Queryable
+
+  # defmacro query(expr) do
+  #   quote do
+  #     Gim.Query.__query__(unquote(expr))
+  #   end
+  # end
+
+  def query(queryable) do
+    to_query(queryable)
+  end
+
+  # defmacro expand(queryable, fields) do
+  #   quote do
+  #     Gim.Query.__expand__(unquote(queryable), unquote(fields))
+  #   end
+  # end
+
+  # def __expand__(%__MODULE__{} = query, fields) do
+  #   %__MODULE__{query | expand: List.wrap(fields) ++ query.expand}
+  # end
+
+  # def __expand__(query, fields) do
+  #   query
+  #   |> to_query()
+  #   |> __expand__(fields)
+  # end
+
+  # defmacro filter(queryable, op, filter) do
+  #   filter
+  #   |> Macro.expand(__CALLER__)
+  #   |> check_filter()
+
+  #   quote do
+  #     Gim.Query.__filter__(unquote(queryable), unquote(op), unquote(filter))
+  #   end
+  # end
+
+  def filter(queryable, op \\ nil, filter)
+
+  def filter(%__MODULE__{} = query, nil, {op, _} = filter) when op in [:and, :or] do
+    %__MODULE__{query | filter: join_filter(query.filter, filter)}
+  end
+
+  def filter(%__MODULE__{} = query, op, {op, _} = filter) when op in [:and, :or] do
+    %__MODULE__{query | filter: join_filter(query.filter, filter)}
+  end
+
+  def filter(%__MODULE__{} = query, opx, {op, _} = filter) when op in [:and, :or] do
+    %__MODULE__{query | filter: join_filter(query.filter, {opx, [filter]})}
+  end
+
+  def filter(%__MODULE__{} = query, op, filter) when is_list(filter) do
+    %__MODULE__{query | filter: join_filter(query.filter, {op || :and, filter})}
+  end
+
+  # def filter(query, filter, opts) do
+  #   query
+  #   |> to_query()
+  #   |> filter(filter, opts)
+  # end
+
+  defp join_filter({_, []}, filter) do
+    filter
+  end
+
+  defp join_filter(filter, {_, []}) do
+    filter
+  end
+
+  defp join_filter({op, filter_left}, {op, filter_right}) do
+    {op, filter_left ++ filter_right}
+  end
+
+  defp join_filter(left_filter, {op, filter_right}) do
+    {op, [left_filter | filter_right]}
+  end
+
+  # defp check_filter(filter) do
+  #   IO.inspect(filter)
+  # end
+
   @doc """
   Returns the target nodes following the edges of given label for the given node.
   """

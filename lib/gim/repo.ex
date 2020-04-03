@@ -254,7 +254,7 @@ defmodule Gim.Repo do
         GenServer.call(__MODULE__, {:all})
       end
 
-      defp resolve(%Gim.Query{type: type} = query) when is_type(type) do
+      def resolve(%Gim.Query{type: type} = query) when is_type(type) do
         GenServer.call(__MODULE__, {:resolve, query})
       end
 

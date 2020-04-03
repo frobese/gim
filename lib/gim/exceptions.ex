@@ -39,3 +39,10 @@ defmodule Gim.NoIndexError do
   """
   defexception [:message]
 end
+
+# defmodule Gim.InvalidFilter do
+#   @moduledoc """
+#   Raised at runtime when a query filter is inproper.
+#   """
+#   defexception [:message]
+# end
