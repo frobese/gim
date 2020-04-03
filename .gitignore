@@ -49,3 +49,10 @@ graph_demo-*.tar
 
 # vscode settings
 .vscode
+
+# downloader logs
+download.log
+
+# downloaded data
+etc/*.csv
+etc/*.rdf.gz
