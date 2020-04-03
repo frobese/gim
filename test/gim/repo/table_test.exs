@@ -87,6 +87,11 @@ defmodule GimTest.TableTest do
           assert 473 == length(male_dogs_and_female_cats) + length(female_dogs_and_male_cats)
           assert 473 == length(cats_and_dogs)
         end
+
+        @tag table: true
+        test "filter with function", %{module: module, table: table} do
+          module.query(table, nil, [impound_no: &String.ends_with?(&1, "1")])
+        end
       end
     end
   end

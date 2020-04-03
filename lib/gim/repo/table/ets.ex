@@ -98,12 +98,13 @@ defmodule Gim.Repo.Table.Ets do
   end
 
   def query(%{nodes: nodes}, ids, []) when is_list(ids) do
-    nodes = Enum.reduce(ids, [], fn id, acc ->
-      case :ets.lookup(nodes, id) do
-        [{_, elem}] -> [elem | acc]
-        [] -> acc
-      end
-    end)
+    nodes =
+      Enum.reduce(ids, [], fn id, acc ->
+        case :ets.lookup(nodes, id) do
+          [{_, elem}] -> [elem | acc]
+          [] -> acc
+        end
+      end)
 
     {:ok, nodes}
   end
@@ -112,7 +113,9 @@ defmodule Gim.Repo.Table.Ets do
     case filter(table, filter) do
       {:ok, ids} ->
         query(table, ids, [])
-      err -> err
+
+      err ->
+        err
     end
   end
 
@@ -120,7 +123,9 @@ defmodule Gim.Repo.Table.Ets do
     case filter(table, filter) do
       {:ok, filter_ids} ->
         query(table, intersect(new(ids), filter_ids), [])
-      err -> err
+
+      err ->
+        err
     end
   end
 
@@ -170,6 +175,16 @@ defmodule Gim.Repo.Table.Ets do
     end)
   end
 
+  defp index_lookup(table, index, function) when is_function(function, 1) do
+    itab = Map.fetch!(table, index)
+
+    :ets.foldl(
+      fn {attr, ids}, acc -> if apply(function, [attr]), do: join(ids, acc), else: acc end,
+      [],
+      itab
+    )
+  end
+
   defp index_lookup(table, index, attr) do
     itab = Map.fetch!(table, index)
 
@@ -209,7 +224,8 @@ defmodule Gim.Repo.Table.Ets do
     index_lookup(table, field, value)
   rescue
     KeyError ->
-      raise Gim.NoIndexError, "Unable to filter #{inspect(field)} in #{inspect(table.__type__)} by #{inspect(value)}"
+      raise Gim.NoIndexError,
+            "Unable to filter #{inspect(field)} in #{inspect(table.__type__)} by #{inspect(value)}"
   end
 
   defp filter!(table, filter) when is_list(filter) do
