@@ -12,5 +12,31 @@ defmodule Gim do
     ]
   end
   ```
+
+  ## Usage
+
+  Create a repo:
+
+      defmodule MyApp.Repo do
+        use Gim.Repo, otp_app: :my_app
+      end
+
+  And schemas:
+
+      defmodule MyApp.Author do
+        use Gim.Schema
+        alias MyApp.Post
+        schema do
+          property :name, index: :unique
+          property :age, default: 0
+          has_edges :posts, Post
+        end
+      end
+
+  Use queries:
+
+      a = %Author{name: "William Gibson"} |> Repo.insert()
+
+      Repo.all(Author)
   """
 end
