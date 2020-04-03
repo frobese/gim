@@ -40,3 +40,12 @@ graph_demo-*.tar
 
 # Editor and IDE artifacts
 .elixir_ls
+
+# asdf tool-file
+.tool-versions
+
+# iex
+.iex.exs
+
+# vscode settings
+.vscode
