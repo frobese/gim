@@ -73,6 +73,8 @@ defmodule Gim.Schema do
         props = @gim_props |> Enum.reverse
         assocs = @gim_assocs |> Enum.reverse
 
+        def __schema__(:gim), do: true
+
         def __schema__(:properties), do: unquote(Enum.map(props, &elem(&1, 0)))
 
         def __schema__(:indexes), do: unquote(props |> Enum.filter(&elem(&1, 1)) |> Enum.map(&elem(&1, 0)))

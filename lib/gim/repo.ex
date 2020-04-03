@@ -23,31 +23,35 @@ defmodule Gim.Repo do
     quote bind_quoted: [types: types] do
       use GenServer
 
-      for type <- types do
-        ref = Module.concat(__MODULE__, type)
-        uindexes = type.__schema__(:indexes_unique)
-        nindexes = type.__schema__(:indexes_non_unique)
-        defmodule ref do
-          use Gim.Repo.Table, type: type, uindexes: uindexes, nindexes: nindexes
-        end
-      end
+      # for type <- types do
+      #   ref = Module.concat(__MODULE__, type)
+      #   uindexes = type.__schema__(:indexes_unique)
+      #   nindexes = type.__schema__(:indexes_non_unique)
+      #   defmodule ref do
+      #     use Gim.Repo.Table, type: type, uindexes: uindexes, nindexes: nindexes
+      #   end
+
+      # end
 
       defmodule State do
         @moduledoc false
         defstruct types # Repo state consists of all type tables
       end
 
-      @default_args [name: __MODULE__]
+      @default_args [name: __MODULE__, table: Gim.Repo.Table.Ets]
       def start_link(args \\ []) do
         args = Keyword.merge(@default_args, args)
-        GenServer.start_link(__MODULE__, args, name: args[:name])
+        GenServer.start_link(__MODULE__, args, name: args[:name], spawn_opt: [fullsweep_after: 50])
       end
 
       @impl true
-      def init(_args) do
+      def init(args) do
+        module = Keyword.get(args, :table)
+
         tables = Enum.into(unquote(types), %{}, fn type ->
-          ref = Module.concat(__MODULE__, type)
-          {type, ref.new()}
+          reference = Module.concat(__MODULE__, type)
+          table = module.new(reference, type)
+          {type, {reference, module, table}}
         end)
 
         {:ok, struct(State, tables)}
@@ -63,75 +67,75 @@ defmodule Gim.Repo do
       @impl true
       def handle_call({:all}, _from, state) do
         nodes = for type <- unquote(types) do
-          ref = Module.concat(__MODULE__, type)
-          %{^type => table} = state
-          ref.all(table)
+          # ref = Module.concat(__MODULE__, type)
+          %{^type => {_, module, table}} = state
+          module.all(table)
         end |> List.flatten()
 
         {:reply, nodes, state}
       end
 
       for type <- types do
-        ref = Module.concat(__MODULE__, type)
+        # ref = Module.concat(__MODULE__, type)
 
         @impl true
-        def handle_call({:all, unquote(type)}, _from, %{unquote(type) => table} = state) do
-          nodes = {:ok, unquote(ref).all(table)}
+        def handle_call({:all, unquote(type)}, _from, %{unquote(type) => {_, module, table}} = state) do
+          nodes = {:ok, module.all(table)}
 
           {:reply, nodes, state}
         end
 
         @impl true
-        def handle_call({:get_by, unquote(type), key, value}, _from, %{unquote(type) => table} = state) do
-          nodes = unquote(ref).get_by(table, key, value)
+        def handle_call({:get_by, unquote(type), key, value}, _from, %{unquote(type) => {_, module, table}} = state) do
+          nodes = module.get_by(table, key, value)
 
           {:reply, nodes, state}
         end
 
         @impl true
-        def handle_call({:get, unquote(type), key, value}, _from, %{unquote(type) => table} = state) do
-          nodes = unquote(ref).get(table, key, value)
+        def handle_call({:get, unquote(type), key, value}, _from, %{unquote(type) => {_, module, table}} = state) do
+          nodes = module.get(table, key, value)
 
           {:reply, nodes, state}
         end
 
         @impl true
-        def handle_call({:fetch, unquote(type), id}, _from, %{unquote(type) => table} = state) do
-          node = unquote(ref).fetch!(table, id)
+        def handle_call({:fetch, unquote(type), id}, _from, %{unquote(type) => {_, module, table}} = state) do
+          node = module.fetch!(table, id)
 
           {:reply, node, state}
         end
 
         @impl true
-        def handle_call({:insert, %{__struct__: unquote(type)} = node}, _from, %{unquote(type) => table} = state) do
+        def handle_call({:insert, %{__struct__: unquote(type)} = node}, _from, %{unquote(type) => {_, module, table}} = state) do
           node = %{node | __repo__: __MODULE__}
-          node = unquote(ref).insert(table, node)
+          node = module.insert(table, node)
 
           reflect_assocs(state, node)
           {:reply, node, state}
         end
 
         @impl true
-        def handle_cast({:update, %{__struct__: unquote(type)} = node}, %{unquote(type) => table} = state) do
-          unquote(ref).update(table, node)
+        def handle_cast({:update, %{__struct__: unquote(type)} = node}, %{unquote(type) => {_, module, table}} = state) do
+          module.update(table, node)
 
           reflect_assocs(state, node)
           {:noreply, state}
         end
 
         @impl true
-        def handle_call({:merge, %{__struct__: unquote(type), __id__: id} = node}, _from, %{unquote(type) => table} = state) do
-          old = unquote(ref).fetch!(table, id)
+        def handle_call({:merge, %{__struct__: unquote(type), __id__: id} = node}, _from, %{unquote(type) => {_, module, table}} = state) do
+          old = module.fetch!(table, id)
           node = node_merge(old, node)
-          unquote(ref).update(table, node)
+          module.update(table, node)
 
           reflect_assocs(state, node)
           {:reply, node, state}
         end
 
         @impl true
-        def handle_cast({:delete, %{__struct__: unquote(type), __id__: _id} = node}, %{unquote(type) => table} = state) do
-          unquote(ref).delete(table, node)
+        def handle_cast({:delete, %{__struct__: unquote(type), __id__: _id} = node}, %{unquote(type) => {_, module, table}} = state) do
+          module.delete(table, node)
 
           {:noreply, state}
         end
@@ -242,19 +246,19 @@ defmodule Gim.Repo do
         :ok # unset single edge
       end
       for type <- types do
-        ref = Module.concat(__MODULE__, type)
-        def reflect_edge(unquote(type), table, reflect, id, target) do
-#          case unquote(ref).fetch(table, target) do
+        # ref = Module.concat(__MODULE__, type)
+        def reflect_edge(unquote(type), {ref, module, table}, reflect, id, target) do
+#          case module.fetch(table, target) do
 #            {:ok, node} ->
 #              node = put_edge(node, reflect, id)
-#              unquote(ref).update(table, node)
+#              module.update(table, node)
 #            _ ->
-#              IO.puts("Missing node #{inspect unquote(ref)} #{inspect target} on reflect #{inspect reflect}, id #{inspect id}")
+#              IO.puts("Missing node #{inspect module} #{inspect target} on reflect #{inspect reflect}, id #{inspect id}")
 #              table
 #          end
-          node = unquote(ref).fetch!(table, target)
+          node = module.fetch!(table, target)
           node = put_edge(node, reflect, id)
-          unquote(ref).update(table, node)
+          module.update(table, node)
         end
       end
 
@@ -361,7 +365,7 @@ defmodule Gim.Repo do
       end
 
       for type <- types do
-        ref = Module.concat(__MODULE__, type)
+        # ref = Module.concat(__MODULE__, type)
         assocs = type.__schema__(:associations)
 
         def create(%{unquote(type) => tables}, %{__struct__: unquote(type)} = node) do
@@ -370,7 +374,7 @@ defmodule Gim.Repo do
             clear_edges(node, assoc)
           end)
           naked = %{naked | __repo__: __MODULE__}
-          %{__id__: id, __repo__: repo} = unquote(ref).insert(naked)
+          %{__id__: id, __repo__: repo} = insert(naked)
 
           %{node | __id__: id, __repo__: repo}
         end
@@ -428,12 +432,12 @@ defmodule Gim.Repo do
       Update a node by replacing the attributes and merging the edges.
       """
       for type <- types do
-        ref = Module.concat(__MODULE__, type)
+        # ref = Module.concat(__MODULE__, type)
 
-        def merge(%{unquote(type) => tables}, %{__struct__: unquote(type), __id__: id} = node) do
-          old = unquote(ref).fetch!(tables, id)
+        def merge(%{unquote(type) => {_, module, table}}, %{__struct__: unquote(type), __id__: id} = node) do
+          old = module.fetch!(table, id)
           node = node_merge(old, node)
-          unquote(ref).update(tables, node)
+          module.update(table, node)
         end
       end
 
