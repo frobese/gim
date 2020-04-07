@@ -7,7 +7,7 @@ defmodule GimTest do
   alias Biblio.{Repo, Author, Book, Publisher}
 
   setup do
-    Biblio.setup(:set1)
+    Biblio.setup(:set3)
     # {:ok, pid: pid}
   end
 
@@ -30,11 +30,29 @@ defmodule GimTest do
 
   test "get" do
     assert [%Book{title: "Neuromancer"}] = Repo.get(Book, :title, "Neuromancer")
-    assert_raise Gim.NoIndexError,fn -> Repo.get(Book, :body, nil) end
+    assert_raise Gim.NoIndexError, fn -> Repo.get(Book, :body, nil) end
   end
 
   test "fetch" do
     assert {:ok, %Book{title: "Neuromancer"}} = Repo.fetch(Book, :title, "Neuromancer")
     assert {:error, Gim.NoNodeError} = Repo.fetch(Book, :title, "Neuroma")
+  end
+
+  test "edges" do
+    assert [book] = Repo.get(Book, :title, "Neuromancer")
+
+    assert %Author{name: "William Gibson"} = author = Gim.Query.edge(book, :authored_by)
+
+    assert [%Book{title: "Neuromancer"}, %Book{title: "Count Zero"}] =
+             Enum.sort(Gim.Query.edges(author, :author_of))
+  end
+
+  test "repo guard" do
+    require Biblio.Repo
+
+    assert Biblio.Repo.is_type(Author)
+    assert Biblio.Repo.is_type(Book)
+    assert Biblio.Repo.is_type(Publisher)
+    refute Biblio.Repo.is_type(GimTest.Animal)
   end
 end

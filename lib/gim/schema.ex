@@ -90,12 +90,17 @@ defmodule Gim.Schema do
 
         def __schema__(:associations), do: unquote(Enum.map(assocs, &elem(&1, 0)))
 
-        for {name, _type, reflect} <- @gim_assocs do
-          def __schema__(:association, unquote(name)), do: unquote(reflect)
+        for {name, _, _, _} = assoc <- @gim_assocs do
+          def __schema__(:association, unquote(name)), do: unquote(Macro.escape(assoc))
         end
         def __schema__(:association, _), do: nil
-
-        for {name, type, _reflect} <- @gim_assocs do
+        
+        for {name, _, _, reflect} = assoc <- @gim_assocs do
+          def __schema__(:reflect, unquote(name)), do: unquote(reflect)
+        end
+        def __schema__(:reflect, _), do: nil
+        
+        for {name, _cardinality, type, _reflect} <- @gim_assocs do
           def __schema__(:type, unquote(name)), do: unquote(type)
         end
         def __schema__(:type, _), do: nil
@@ -273,7 +278,7 @@ defmodule Gim.Schema do
     check_type!(type, "has_edges/3")
     check_options!(opts, @valid_has_options, "has_edges/3")
     put_struct_property(mod, name, Keyword.get(opts, :default, []))
-    Module.put_attribute(mod, :gim_assocs, {name, type, reflect})
+    Module.put_attribute(mod, :gim_assocs, {name, :many, type, reflect})
   end
 
   @doc false
@@ -281,7 +286,7 @@ defmodule Gim.Schema do
     check_type!(type, "has_edge/3")
     check_options!(opts, @valid_has_options, "has_edge/3")
     put_struct_property(mod, name, Keyword.get(opts, :default))
-    Module.put_attribute(mod, :gim_assocs, {name, type, reflect})
+    Module.put_attribute(mod, :gim_assocs, {name, :one, type, reflect})
   end
 
   ## Private

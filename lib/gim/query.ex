@@ -10,6 +10,8 @@ defmodule Gim.Query do
 
   import Gim.Queryable
 
+  alias Gim.Repo.Index
+
   # defmacro query(expr) do
   #   quote do
   #     Gim.Query.__query__(unquote(expr))
@@ -26,14 +28,14 @@ defmodule Gim.Query do
   #   end
   # end
 
-  # def __expand__(%__MODULE__{} = query, fields) do
+  # def expand(%__MODULE__{} = query, fields) do
   #   %__MODULE__{query | expand: List.wrap(fields) ++ query.expand}
   # end
 
-  # def __expand__(query, fields) do
+  # def expand(query, fields) do
   #   query
   #   |> to_query()
-  #   |> __expand__(fields)
+  #   |> expand(fields)
   # end
 
   # defmacro filter(queryable, op, filter) do
@@ -96,12 +98,14 @@ defmodule Gim.Query do
   def edges(nodes, assoc) when is_list(nodes) do
     Enum.map(nodes, &edges(&1, assoc))
     |> List.flatten()
-    |> Enum.uniq() # TODO: could use dedup if sorted
+    # TODO: could use dedup if sorted
+    |> Enum.uniq()
   end
+
   def edges(%{__struct__: struct, __repo__: repo} = node, assoc) do
     ids = Map.fetch!(node, assoc)
     type = struct.__schema__(:type, assoc)
-    repo.fetch!(type, ids)
+    Enum.map(ids, &repo.fetch!(type, &1))
   end
 
   @doc """
@@ -130,12 +134,23 @@ defmodule Gim.Query do
     not has_edges?(node)
   end
 
-  def add_edge(node, assoc, targets) when is_list(targets) do
-    ids = targets |> Enum.map(fn %{__id__: id} -> id end)
-    Map.update!(node, assoc, fn x -> ids ++ x end)
+  def add_edge(%struct{} = node, assoc, targets) when is_list(targets) do
+    assoc = struct.__schema__(:association, assoc)
+    Enum.reduce(targets, node, &__add_edge__(&2, assoc, &1))
   end
-  def add_edge(node, assoc, %{__id__: id} = _target) do
-    Map.update!(node, assoc, fn x -> [id | x] end)
+
+  def add_edge(%struct{} = node, assoc, target) do
+    assoc = struct.__schema__(:association, assoc)
+    __add_edge__(node, assoc, target)
+  end
+
+  def __add_edge__(node, {assoc, :one, type, _}, %type{__id__: id}) do
+    %{node | assoc => id}
+  end
+
+  def __add_edge__(node, {assoc, :many, type, _}, %type{__id__: id}) do
+    ids = Index.add(Map.fetch!(node, assoc), id)
+    %{node | assoc => ids}
   end
 
   def delete_edge(node, assoc, targets) when is_list(targets) do
@@ -143,41 +158,54 @@ defmodule Gim.Query do
       delete_edge(node, assoc, target)
     end)
   end
+
   def delete_edge(node, assoc, %{__id__: id} = _target) do
     case Map.fetch!(node, assoc) do
       nil ->
         node
+
       [] ->
         node
+
       x when is_list(x) ->
         Map.put(node, assoc, List.delete(x, id))
+
       ^id ->
         Map.put(node, assoc, nil)
+
       _ ->
-        node # TODO: maybe raise error?
+        # TODO: maybe raise error?
+        node
     end
   end
 
-  def clear_edges(nodes, assoc) when is_list(nodes) do
-    Enum.map(nodes, &clear_edges(&1, assoc))
+  def clear_edges(%struct{} = node) do
+    assocs = struct.__schema__(:associations)
+
+    Enum.reduce(assocs, node, fn assoc, node ->
+      clear_edge(node, assoc)
+    end)
   end
-  def clear_edges(node, assoc) do
-    case Map.fetch!(node, assoc) do
-      nil ->
-        node
-      [] ->
-        node
-      x when is_list(x) ->
-        Map.put(node, assoc, [])
-      _ ->
+
+  def clear_edge(%struct{} = node, assoc) do
+    case struct.__schema__(:association, assoc) do
+      {_, :one, _, _} ->
         Map.put(node, assoc, nil)
+
+      {_, :many, _, _} ->
+        Map.put(node, assoc, [])
+
+      _ ->
+        node
     end
   end
 
   def edge(nodes, assoc) when is_list(nodes) do
     Enum.map(nodes, &edge(&1, assoc))
-    |> Enum.uniq() # TODO: could use dedup if sorted
+    # TODO: could use dedup if sorted
+    |> Enum.uniq()
   end
+
   def edge(%{__struct__: struct, __repo__: repo} = node, assoc) do
     id = Map.fetch!(node, assoc)
     type = struct.__schema__(:type, assoc)
@@ -191,6 +219,7 @@ defmodule Gim.Query do
   def property(nodes, property_name) when is_list(nodes) do
     Enum.map(nodes, &Map.get(&1, property_name))
   end
+
   def property(node, property_name) do
     Map.get(node, property_name)
   end
@@ -211,6 +240,7 @@ defmodule Gim.Query do
       reachable(node, edge, target)
     end)
   end
+
   def reachable(node, edge, target) do
     # TODO: check node type
     edges = Map.fetch!(node, edge)
@@ -222,6 +252,7 @@ defmodule Gim.Query do
       reachable(e, target)
     end)
   end
+
   defp reachable(edge, %{__id__: id}) do
     edge == id
   end
@@ -233,13 +264,16 @@ defmodule Gim.Query do
   """
   def isolated(repo) do
     all_nodes = repo.dump()
-    lonely = all_nodes
+
+    lonely =
+      all_nodes
       |> Enum.filter(&has_no_edges?/1)
       |> Enum.map(fn %{__struct__: struct, __id__: id} -> {struct, id} end)
       |> Enum.into(MapSet.new())
 
     Enum.reduce(all_nodes, lonely, fn %{__struct__: struct} = node, lonely ->
       assocs = struct.__schema__(:associations)
+
       Enum.reduce(assocs, lonely, fn assoc, lonely ->
         type = struct.__schema__(:type, assoc)
         edges = Map.fetch!(node, assoc)
@@ -249,9 +283,9 @@ defmodule Gim.Query do
     end)
 
     all_nodes
-      |> Enum.filter(fn %{__struct__: struct, __id__: id} ->
-        MapSet.member?(lonely, {struct, id})
-      end)
+    |> Enum.filter(fn %{__struct__: struct, __id__: id} ->
+      MapSet.member?(lonely, {struct, id})
+    end)
   end
 
   defp set_delete(set, type, edges) when is_list(edges) do
@@ -259,6 +293,7 @@ defmodule Gim.Query do
       set_delete(set, type, edge)
     end)
   end
+
   defp set_delete(set, type, edge) do
     MapSet.delete(set, {type, edge})
   end
