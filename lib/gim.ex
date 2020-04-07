@@ -37,21 +37,44 @@ defmodule Gim do
         end
       end
 
+      defmodule MyApp.Publisher do
+        use Gim.Schema
+
+        alias MyApp.Book
+
+        schema do
+          property(:name, index: :unique)
+          has_edges(:publisher_of, Book, reflect: :published_by)
+        end
+      end
+
+
   Create a repo:
 
       defmodule MyApp.Repo do
         use Gim.Repo,
           types: [
             MyApp.Author,
-            MyApp.Book
+            MyApp.Book,
+            MyApp.Publisher
           ]
       end
 
 
   Use queries:
 
-      iex> a = %MyApp.Author{name: "William Gibson"} |> Repo.insert()
+      iex> MyApp.Repo.fetch!(MyApp.Author, :name, "Terry Pratchett")
+      %MyApp.Author{__id__: 2, __repo__: MyApp.Repo, age: 0, author_of: [4, 3], name: "Terry Pratchett"}
 
-      iex> Repo.all(Author)
+      iex> terry = MyApp.Repo.fetch!(MyApp.Author, :name, "Terry Pratchett")
+      iex> {:ok, [cs]} = MyApp.Publisher
+      ...> |> Gim.Query.query()
+      ...> |> Gim.Query.filter(name: &String.starts_with?(&1, "Colin"))
+      ...> |> MyApp.Repo.resolve()
+      iex> %MyApp.Book{title: "The Colour of Magic"}
+      ...> |> Gim.Query.add_edge(:authored_by, terry)
+      ...> |> Gim.Query.add_edge(:published_by, cs)
+      ...> |> MyApp.Repo.insert!()
+      %MyApp.Book{__id__: 5, __repo__: MyApp.Repo, authored_by: 2, body: nil, published_by: [3], title: "The Colour of Magic"}
   """
 end

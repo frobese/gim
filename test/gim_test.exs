@@ -1,8 +1,9 @@
 defmodule GimTest do
   @moduledoc false
   use ExUnit.Case
+  alias GimTest.Biblio, as: MyApp
 
-  # doctest Gim, import: true
+  doctest Gim, import: true
 
   alias GimTest.Biblio
   alias Biblio.{Repo, Author, Book, Publisher}
