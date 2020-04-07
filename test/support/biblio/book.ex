@@ -1,4 +1,5 @@
 defmodule GimTest.Biblio.Book do
+  @moduledoc false
   use Gim.Schema
 
   alias GimTest.Biblio.Author

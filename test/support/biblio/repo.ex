@@ -1,4 +1,5 @@
 defmodule GimTest.Biblio.Repo do
+  @moduledoc false
   alias GimTest.Biblio
 
   @moduledoc false

@@ -1,4 +1,5 @@
 defmodule GimTest.Movies.Performance do
+  @moduledoc false
   use Gim.Schema
 
   alias GimTest.Movies.{Movie, Person, Character}

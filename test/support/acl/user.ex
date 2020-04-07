@@ -1,4 +1,5 @@
 defmodule GimTest.Acl.User do
+  @moduledoc false
   use Gim.Schema
 
   alias GimTest.Acl.Access

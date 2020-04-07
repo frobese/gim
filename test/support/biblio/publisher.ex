@@ -1,4 +1,5 @@
 defmodule GimTest.Biblio.Publisher do
+  @moduledoc false
   use Gim.Schema
 
   alias GimTest.Biblio.Book

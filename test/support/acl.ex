@@ -1,4 +1,5 @@
 defmodule GimTest.Acl do
+  @moduledoc false
   alias GimTest.Acl.{Access, Permission, Resource, Role, User, Repo}
 
   @acls %{

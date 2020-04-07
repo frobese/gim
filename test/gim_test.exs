@@ -1,4 +1,5 @@
 defmodule GimTest do
+  @moduledoc false
   use ExUnit.Case
 
   # doctest Gim, import: true

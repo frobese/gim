@@ -1,4 +1,5 @@
 defmodule GimTest.Movies do
+  @moduledoc false
   alias GimTest.Movies.{Repo, Person, Genre, Movie, Performance, Character}
   # alias __MODULE__
 

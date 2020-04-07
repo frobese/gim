@@ -1,4 +1,5 @@
 defmodule GimTest.TableTest do
+  @moduledoc false
   use ExUnit.Case
 
   alias Gim.Repo.Table
@@ -8,6 +9,7 @@ defmodule GimTest.TableTest do
     mod_name = Module.concat(__MODULE__, module)
 
     defmodule mod_name do
+      @moduledoc false
       use ExUnit.Case, async: false
 
       setup_all do
@@ -64,9 +66,10 @@ defmodule GimTest.TableTest do
                ]}
             )
 
-            for animal <- male_dogs_and_female_cats do
-              assert (animal.animal_type == "Cat" and animal.sex == :female) or (animal.animal_type == "Dog" and animal.sex == :male)
-            end
+          for animal <- male_dogs_and_female_cats do
+            assert (animal.animal_type == "Cat" and animal.sex == :female) or
+                     (animal.animal_type == "Dog" and animal.sex == :male)
+          end
 
           {:ok, female_dogs_and_male_cats} =
             module.query(
@@ -79,9 +82,10 @@ defmodule GimTest.TableTest do
                ]}
             )
 
-            for animal <- female_dogs_and_male_cats do
-              assert (animal.animal_type == "Dog" and animal.sex == :female) or (animal.animal_type == "Cat" and animal.sex == :male)
-            end
+          for animal <- female_dogs_and_male_cats do
+            assert (animal.animal_type == "Dog" and animal.sex == :female) or
+                     (animal.animal_type == "Cat" and animal.sex == :male)
+          end
 
           assert 473 == length(dogs) + length(cats)
           assert 473 == length(male_dogs_and_female_cats) + length(female_dogs_and_male_cats)
@@ -90,7 +94,7 @@ defmodule GimTest.TableTest do
 
         @tag table: true
         test "filter with function", %{module: module, table: table} do
-          module.query(table, nil, [impound_no: &String.ends_with?(&1, "1")])
+          module.query(table, nil, impound_no: &String.ends_with?(&1, "1"))
         end
       end
     end

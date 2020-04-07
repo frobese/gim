@@ -1,4 +1,5 @@
 defmodule GimTest.Movies.Repo do
+  @moduledoc false
   alias GimTest.Movies
   alias __MODULE__
 

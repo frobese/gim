@@ -1,4 +1,5 @@
 defmodule GimTest.Biblio do
+  @moduledoc false
   alias GimTest.Biblio.{Repo, Author, Book, Publisher}
 
   @sets [:set1, :set2, :set3]

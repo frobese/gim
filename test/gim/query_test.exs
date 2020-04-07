@@ -1,4 +1,5 @@
 defmodule GimTest.QueryTest do
+  @moduledoc false
   use ExUnit.Case, async: false
 
   import Gim.Query, only: [query: 1, filter: 2, filter: 3]
@@ -7,6 +8,7 @@ defmodule GimTest.QueryTest do
   alias GimTest.Animal
 
   defmodule Repo do
+    @moduledoc false
     use Gim.Repo,
       types: [
         Animal
@@ -41,52 +43,58 @@ defmodule GimTest.QueryTest do
 
   @tag query: true
   test "simple queries" do
-    {:ok, dogs} = Animal
-    |> query()
-    |> filter(animal_type: "Dog")
-    |> Repo.resolve()
+    {:ok, dogs} =
+      Animal
+      |> query()
+      |> filter(animal_type: "Dog")
+      |> Repo.resolve()
 
     for dog <- dogs do
       assert dog.animal_type == "Dog"
     end
 
-    {:ok, cats} = Animal
-    |> query()
-    |> filter(animal_type: "Cat")
-    |> Repo.resolve()
+    {:ok, cats} =
+      Animal
+      |> query()
+      |> filter(animal_type: "Cat")
+      |> Repo.resolve()
 
     for cat <- cats do
       assert cat.animal_type == "Cat"
     end
 
-    {:ok, cats_and_dogs} = Animal
-    |> query()
-    |> filter(animal_type: "Dog")
-    |> filter(:or, animal_type: "Cat")
-    |> Repo.resolve()
+    {:ok, cats_and_dogs} =
+      Animal
+      |> query()
+      |> filter(animal_type: "Dog")
+      |> filter(:or, animal_type: "Cat")
+      |> Repo.resolve()
 
-    {:ok, male_dogs_and_female_cats} = Animal
-    |> query()
-    |> filter(animal_type: "Dog")
-    |> filter(sex: :male)
-    |> filter(:or, {:and, animal_type: "Cat", sex: :female})
-    |> Repo.resolve()
+    {:ok, male_dogs_and_female_cats} =
+      Animal
+      |> query()
+      |> filter(animal_type: "Dog")
+      |> filter(sex: :male)
+      |> filter(:or, {:and, animal_type: "Cat", sex: :female})
+      |> Repo.resolve()
 
-      for animal <- male_dogs_and_female_cats do
-        assert (animal.animal_type == "Cat" and animal.sex == :female) or (animal.animal_type == "Dog" and animal.sex == :male)
-      end
+    for animal <- male_dogs_and_female_cats do
+      assert (animal.animal_type == "Cat" and animal.sex == :female) or
+               (animal.animal_type == "Dog" and animal.sex == :male)
+    end
 
     {:ok, female_dogs_and_male_cats} =
-    Animal
-    |> query()
-    |> filter(animal_type: "Cat")
-    |> filter(sex: :male)
-    |> filter(:or, {:and, animal_type: "Dog", sex: :female})
-    |> Repo.resolve()
+      Animal
+      |> query()
+      |> filter(animal_type: "Cat")
+      |> filter(sex: :male)
+      |> filter(:or, {:and, animal_type: "Dog", sex: :female})
+      |> Repo.resolve()
 
-      for animal <- female_dogs_and_male_cats do
-        assert (animal.animal_type == "Dog" and animal.sex == :female) or (animal.animal_type == "Cat" and animal.sex == :male)
-      end
+    for animal <- female_dogs_and_male_cats do
+      assert (animal.animal_type == "Dog" and animal.sex == :female) or
+               (animal.animal_type == "Cat" and animal.sex == :male)
+    end
 
     assert 473 == length(dogs) + length(cats)
     assert 473 == length(male_dogs_and_female_cats) + length(female_dogs_and_male_cats)
