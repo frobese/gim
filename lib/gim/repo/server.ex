@@ -31,7 +31,8 @@ defmodule Gim.Repo.Server do
   def handle_call({:all}, _from, state) do
     nodes =
       for {_type, {_, module, table}} <- state do
-        module.all(table)
+        {:ok, nodes} = module.query(table, nil, [])
+        nodes
       end
       |> List.flatten()
 
@@ -55,7 +56,7 @@ defmodule Gim.Repo.Server do
         node = module.insert(table, node)
 
         reflect_assocs(state, node)
-        {:reply, node, state}
+        {:reply, {:ok, node}, state}
 
       :error ->
         {:reply, {:error, %Gim.NoSuchTypeError{message: "No such Type #{inspect(type)}"}}, state}

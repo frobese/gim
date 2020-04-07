@@ -151,7 +151,7 @@ defmodule Gim.Repo do
         # remove all edges
         naked = Gim.Query.clear_edges(node)
 
-        %{__id__: id, __repo__: repo} = insert(naked)
+        {:ok, %{__id__: id, __repo__: repo}} = insert(naked)
 
         %{node | __id__: id, __repo__: repo}
       end
@@ -216,12 +216,7 @@ defmodule Gim.Repo do
         # 2nd pass: Resolve (merge)
         nodes
         |> Enum.map(fn {k, node} -> Gim.Repo.__put_assocs__(node, nodes, errors) end)
-        |> Enum.map(fn node ->
-          merge(node)
-          # merge(state, n)
-          # reflect_assocs(state, n)
-          # update(node)
-        end)
+        |> Enum.map(fn node -> merge(node) end)
       end
     end
   end
