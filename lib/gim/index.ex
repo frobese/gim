@@ -1,4 +1,7 @@
-defmodule Gim.Repo.Index do
+defmodule Gim.Index do
+  @moduledoc """
+  Internal helper module to handle indexes.
+  """
   @type id :: pos_integer()
   @type index :: list(id)
 

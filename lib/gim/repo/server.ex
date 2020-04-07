@@ -3,7 +3,7 @@ defmodule Gim.Repo.Server do
   use GenServer
 
   alias Gim.Query
-  alias Gim.Repo.Index
+  alias Gim.Index
 
   @impl true
   def init(args) do

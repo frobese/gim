@@ -10,13 +10,7 @@ defmodule Gim.Query do
 
   import Gim.Queryable
 
-  alias Gim.Repo.Index
-
-  # defmacro query(expr) do
-  #   quote do
-  #     Gim.Query.__query__(unquote(expr))
-  #   end
-  # end
+  alias Gim.Index
 
   def query(queryable) do
     to_query(queryable)

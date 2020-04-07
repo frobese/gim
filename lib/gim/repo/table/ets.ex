@@ -6,7 +6,7 @@ defmodule Gim.Repo.Table.Ets do
   #   :nindexes,
   #   :table
   # ]
-  import Gim.Repo.Index
+  import Gim.Index
 
   def new(reference, type) do
     uindexes = type.__schema__(:indexes_unique)
