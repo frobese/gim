@@ -13,9 +13,7 @@ defmodule Gim.Repo.Index do
   """
   @spec new(list :: index) :: index
   def new(list) do
-    list
-    |> Enum.uniq()
-    |> Enum.reverse()
+    Enum.reduce(list, [], &add(&2, &1))
   end
 
   @doc """
@@ -69,7 +67,7 @@ defmodule Gim.Repo.Index do
   Intersects the given indexes
 
       iex> intersect([99, 66, 77, 50, 30, 10, 0], [99, 70, 60, 50, 11, 10, 1, 0])
-      [99, 50, 10]
+      [99, 50, 10, 0]
 
       iex> intersect([], [99, 70, 60, 50, 11, 10, 1, 0])
       []
@@ -98,7 +96,7 @@ defmodule Gim.Repo.Index do
   @doc """
   Intersects a list of indexes
 
-      iex> intersect([[99, 66, 77, 50, 30, 10, 0], [99, 70, 60, 50, 11, 10, 1, 0], [99, 50, 10]])
+      iex> intersect([[99, 77, 66, 50, 30, 10, 0], [99, 70, 60, 50, 11, 10, 1, 0], [99, 50, 10]])
       [99, 50, 10]
   """
   @spec intersect(indexes :: list(index)) :: index
@@ -114,7 +112,7 @@ defmodule Gim.Repo.Index do
       iex> join([99, 50, 13], [90, 50, 10])
       [99, 90, 50, 13, 10]
 
-      iex> intersect([], [99, 70, 60, 50, 11, 10, 1, 0])
+      iex> join([], [99, 70, 60, 50, 11, 10, 1, 0])
       [99, 70, 60, 50, 11, 10, 1, 0]
   """
   @spec join(index_a :: index, index_b :: index) :: index
@@ -141,7 +139,7 @@ defmodule Gim.Repo.Index do
   @doc """
   Intersects a list of indexes
 
-      iex> intersect([[99, 55, 42, 11], [98, 54, 42, 10], [90, 50, 42]])
+      iex> join([[99, 55, 42, 11], [98, 54, 42, 10], [90, 50, 42]])
       [99, 98, 90, 55 , 54, 50, 42, 11, 10]
   """
   @spec join(indexes :: list(index)) :: index
@@ -149,5 +147,43 @@ defmodule Gim.Repo.Index do
     lists
     |> Enum.sort()
     |> Enum.reduce(&join/2)
+  end
+
+  @doc """
+  Returns the difference of two given indexes
+
+      iex> difference([99, 66, 77, 50, 30, 10, 0], [99, 70, 60, 50, 11, 10, 1, 0])
+      {[77, 66, 30], [70, 60, 11, 1]}
+
+      iex> difference([5, 4, 3, 2, 1], [5, 4, 3, 2, 1])
+      {[], []}
+
+      iex> difference([], [])
+      {[], []}
+  """
+  def difference(index_a, index_b) do
+    difference(index_a, index_b, {[], []})
+  end
+
+  defp difference(index_a, [], {diff_a, diff_b}) do
+    {join(index_a, diff_a), diff_b}
+  end
+
+  defp difference([], index_b, {diff_a, diff_b}) do
+    {diff_a, join(index_b, diff_b)}
+  end
+
+  defp difference([head | rest_a], [head | rest_b], diff) do
+    difference(rest_a, rest_b, diff)
+  end
+
+  defp difference([head_a | rest_a], [head_b | _] = index_b, {diff_a, diff_b})
+       when head_a > head_b do
+    difference(rest_a, index_b, {add(diff_a, head_a), diff_b})
+  end
+
+  defp difference([head_a | _] = index_a, [head_b | rest_b], {diff_a, diff_b})
+       when head_a < head_b do
+    difference(index_a, rest_b, {diff_a, add(diff_b, head_b)})
   end
 end
