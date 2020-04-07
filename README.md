@@ -1,4 +1,5 @@
-# Gim
+<img src="images/gim-wort-bildmarke.png" alt="gim_logo" height="100"/>
+=========
 Schema-based In-Memory Graph Database for Elixir.
 
 Documentation is available on [hex.pm](https://hexdocs.pm/gim)
@@ -14,6 +15,8 @@ def deps do
 end
 ```
 ## Copyright and License
+The __gim__ logo and all its variants are copyright (c) 2020 frobese GmbH.
+
 Copyright 2020 frobese GmbH
 
 Licensed under the Apache License, Version 2.0 (the "License");

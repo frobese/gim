@@ -47,6 +47,7 @@ defmodule Gim.MixProject do
   defp docs do
     [
       main: "Gim",
+      logo: "images/gim-bildmarke.png",
       canonical: "http://hexdocs.pm/gim",
       source_url: "https://github.com/frobese/gim"
     ]
