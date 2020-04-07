@@ -1,6 +1,6 @@
 defmodule Gim do
   @moduledoc """
-  #{Gim.MixProject.project()[:description]}.
+  #{Gim.MixProject.project()[:description]}
 
   ## Usage
   Add Gim to your application by adding `{:gim, "~> #{Mix.Project.config()[:version]}"}` to your list of dependencies in `mix.exs`:
@@ -15,28 +15,43 @@ defmodule Gim do
 
   ## Usage
 
-  Create a repo:
-
-      defmodule MyApp.Repo do
-        use Gim.Repo, otp_app: :my_app
-      end
-
-  And schemas:
+  Create schemas:
 
       defmodule MyApp.Author do
         use Gim.Schema
-        alias MyApp.Post
+
         schema do
-          property :name, index: :unique
-          property :age, default: 0
-          has_edges :posts, Post
+          property(:name, index: :unique)
+          property(:age, default: 0, index: true)
+          has_edges(:author_of, MyApp.Book, reflect: :authored_by)
         end
       end
 
+      defmodule MyApp.Book do
+        use Gim.Schema
+
+        schema do
+          property(:title, index: :unique)
+          property(:body)
+          has_edge(:authored_by, MyApp.Author, reflect: :author_of)
+        end
+      end
+
+  Create a repo:
+
+      defmodule MyApp.Repo do
+        use Gim.Repo,
+          types: [
+            MyApp.Author,
+            MyApp.Book
+          ]
+      end
+
+
   Use queries:
 
-      a = %Author{name: "William Gibson"} |> Repo.insert()
+      iex> a = %MyApp.Author{name: "William Gibson"} |> Repo.insert()
 
-      Repo.all(Author)
+      iex> Repo.all(Author)
   """
 end
