@@ -1,7 +1,6 @@
 defmodule Gim.Query do
   @moduledoc """
   Defines queries on schemas.
-
   """
 
   defstruct type: nil,
@@ -12,120 +11,175 @@ defmodule Gim.Query do
 
   alias Gim.Index
 
+  def query(%__MODULE__{} = query) do
+    query
+  end
+
+  def query(node) when is_map(node) do
+    query([node])
+  end
+
+  def query([%type{} | _rest] = nodes) do
+    type
+    |> to_query()
+    |> __query__(nodes)
+  end
+
   def query(queryable) do
     to_query(queryable)
   end
 
-  # defmacro expand(queryable, fields) do
-  #   quote do
-  #     Gim.Query.__expand__(unquote(queryable), unquote(fields))
-  #   end
-  # end
+  def query(node, edge) when is_map(node) do
+    query([node], edge)
+  end
 
-  # def expand(%__MODULE__{} = query, fields) do
-  #   %__MODULE__{query | expand: List.wrap(fields) ++ query.expand}
-  # end
+  def query([%type{} | _rest] = nodes, edge) do
+    case type.__schema__(:association, edge) do
+      {_, _, type, _} ->
+        __query__(to_query(type), edge, nodes)
 
-  # def expand(query, fields) do
-  #   query
-  #   |> to_query()
-  #   |> expand(fields)
-  # end
+      _ ->
+        raise Gim.QueryError, "No edge #{inspect(edge)} in #{type}"
+    end
+  end
 
-  # defmacro filter(queryable, op, filter) do
-  #   filter
-  #   |> Macro.expand(__CALLER__)
-  #   |> check_filter()
+  def __query__(query, []) do
+    query
+  end
 
-  #   quote do
-  #     Gim.Query.__filter__(unquote(queryable), unquote(op), unquote(filter))
-  #   end
-  # end
+  def __query__(%__MODULE__{type: type} = query, [%type{__id__: id} | nodes])
+      when not is_nil(id) do
+    query
+    |> filter(:or, __id__: id)
+    |> __query__(nodes)
+  end
 
+  def __query__(query, _edge, []) do
+    query
+  end
+
+  def __query__(%__MODULE__{} = query, edge, [%{} = node | nodes]) do
+    edge = Map.fetch!(node, edge)
+
+    edge
+    |> List.wrap()
+    |> Enum.reduce(query, fn node_or_id, query ->
+      if is_integer(node_or_id) do
+        filter(query, :or, __id__: node_or_id)
+      else
+        __query__(query, node_or_id)
+      end
+    end)
+    |> __query__(nodes)
+  end
+
+  @doc """
+  Adds a new filter to the query.
+  """
   def filter(queryable, op \\ nil, filter)
 
   def filter(%__MODULE__{} = query, nil, {op, _} = filter) when op in [:and, :or] do
-    %__MODULE__{query | filter: join_filter(query.filter, filter)}
+    %__MODULE__{query | filter: __join_filter__(query.filter, filter)}
   end
 
   def filter(%__MODULE__{} = query, op, {op, _} = filter) when op in [:and, :or] do
-    %__MODULE__{query | filter: join_filter(query.filter, filter)}
+    %__MODULE__{query | filter: __join_filter__(query.filter, filter)}
   end
 
   def filter(%__MODULE__{} = query, opx, {op, _} = filter) when op in [:and, :or] do
-    %__MODULE__{query | filter: join_filter(query.filter, {opx, [filter]})}
+    %__MODULE__{query | filter: __join_filter__(query.filter, {opx, [filter]})}
   end
 
   def filter(%__MODULE__{} = query, op, filter) when is_list(filter) do
-    %__MODULE__{query | filter: join_filter(query.filter, {op || :and, filter})}
+    %__MODULE__{query | filter: __join_filter__(query.filter, {op || :and, filter})}
   end
 
-  # def filter(query, filter, opts) do
-  #   query
-  #   |> to_query()
-  #   |> filter(filter, opts)
-  # end
-
-  defp join_filter({_, []}, filter) do
+  @doc false
+  def __join_filter__({_, []}, filter) do
     filter
   end
 
-  defp join_filter(filter, {_, []}) do
+  def __join_filter__(filter, {_, []}) do
     filter
   end
 
-  defp join_filter({op, filter_left}, {op, filter_right}) do
+  def __join_filter__({op, filter_left}, {op, filter_right}) do
     {op, filter_left ++ filter_right}
   end
 
-  defp join_filter(left_filter, {op, filter_right}) do
+  def __join_filter__(left_filter, {op, filter_right}) do
     {op, [left_filter | filter_right]}
   end
 
-  # defp check_filter(filter) do
-  #   IO.inspect(filter)
-  # end
+  def expand(queryable, edge_or_path)
+
+  def expand(%__MODULE__{type: type, expand: expand} = query, path) do
+    %__MODULE__{query | expand: __join_expand__(type, expand, path)}
+  end
+
+  @doc false
+  def __join_expand__(type, expand, edge) when not is_list(edge) do
+    __join_expand__(type, expand, [edge])
+  end
+
+  def __join_expand__(type, expand, [{edge, nested} | path]) do
+    case type.__schema__(:association, edge) do
+      {_name, _cardinality, nested_type, _} ->
+        nested_expand = Keyword.get(expand, edge, [])
+        expand = Keyword.put(expand, edge, __join_expand__(nested_type, nested_expand, nested))
+
+        __join_expand__(type, expand, path)
+
+      nil ->
+        raise Gim.QueryError, "No edge #{inspect(edge)} in #{type}"
+    end
+  end
+
+  def __join_expand__(type, expand, [edge | path]) do
+    __join_expand__(type, expand, [{edge, []} | path])
+  end
+
+  def __join_expand__(_type, expand, []) do
+    expand
+  end
 
   @doc """
   Returns the target nodes following the edges of given label for the given node.
   """
-  def edges(nodes, assoc) when is_list(nodes) do
-    Enum.map(nodes, &edges(&1, assoc))
-    |> List.flatten()
-    # TODO: could use dedup if sorted
-    |> Enum.uniq()
+  def edges([%{__repo__: repo} | _] = nodes, assoc) do
+    nodes
+    |> query(assoc)
+    |> repo.resolve!()
   end
 
-  def edges(%{__struct__: struct, __repo__: repo} = node, assoc) do
-    ids = Map.fetch!(node, assoc)
-    type = struct.__schema__(:type, assoc)
-    Enum.map(ids, &repo.fetch!(type, &1))
+  def edges(node, assoc) when is_map(node) do
+    edges([node], assoc)
   end
 
   @doc """
   Returns wether the given node has any outgoing edges.
   """
-  def has_edges?(%{__struct__: struct} = node) do
-    assocs = struct.__schema__(:associations)
+  def has_edges?(%type{} = node) do
+    assocs = type.__schema__(:associations)
     Enum.any?(assocs, &has_edge?(node, &1))
   end
 
   @doc """
   Returns wether the given node has any outgoing edges for the given label.
   """
-  def has_edge?(node, assoc) do
-    case Map.fetch!(node, assoc) do
-      [] -> false
-      nil -> false
-      _ -> true
-    end
-  end
+  def has_edge?(%type{} = node, assoc) do
+    edge = Map.get(node, assoc)
 
-  @doc """
-  Returns wether the given node has no outgoing edges.
-  """
-  def has_no_edges?(node) do
-    not has_edges?(node)
+    case type.__schema__(:association, assoc) do
+      {_, :one, _, _} ->
+        !is_nil(edge)
+
+      {_, :many, _, _} ->
+        length(edge) > 0
+
+      _ ->
+        raise Gim.UnknownEdgeError, "No edge #{inspect(assoc)} in #{inspect(type)}"
+    end
   end
 
   def add_edge(%struct{} = node, assoc, targets) when is_list(targets) do
@@ -147,30 +201,24 @@ defmodule Gim.Query do
     %{node | assoc => ids}
   end
 
-  def delete_edge(node, assoc, targets) when is_list(targets) do
-    Enum.reduce(targets, node, fn target, node ->
-      delete_edge(node, assoc, target)
-    end)
+  def delete_edge(%struct{} = node, assoc, targets) when is_list(targets) do
+    assoc = struct.__schema__(:association, assoc)
+    Enum.reduce(targets, node, &__delete_edge__(&2, assoc, &1))
   end
 
-  def delete_edge(node, assoc, %{__id__: id} = _target) do
-    case Map.fetch!(node, assoc) do
-      nil ->
-        node
+  def delete_edge(%struct{} = node, assoc, target) do
+    assoc = struct.__schema__(:association, assoc)
+    __delete_edge__(node, assoc, target)
+  end
 
-      [] ->
-        node
+  @doc false
+  def __delete_edge__(node, {assoc, :one, type, _}, %type{}) do
+    %{node | assoc => nil}
+  end
 
-      x when is_list(x) ->
-        Map.put(node, assoc, List.delete(x, id))
-
-      ^id ->
-        Map.put(node, assoc, nil)
-
-      _ ->
-        # TODO: maybe raise error?
-        node
-    end
+  def __delete_edge__(node, {assoc, :many, type, _}, %type{__id__: id}) do
+    ids = Index.remove(Map.fetch!(node, assoc), id)
+    %{node | assoc => ids}
   end
 
   def clear_edges(%struct{} = node) do
@@ -194,32 +242,7 @@ defmodule Gim.Query do
     end
   end
 
-  def edge(nodes, assoc) when is_list(nodes) do
-    Enum.map(nodes, &edge(&1, assoc))
-    # TODO: could use dedup if sorted
-    |> Enum.uniq()
-  end
-
-  def edge(%{__struct__: struct, __repo__: repo} = node, assoc) do
-    id = Map.fetch!(node, assoc)
-    type = struct.__schema__(:type, assoc)
-    repo.fetch!(type, id)
-  end
-
-  def set_edge(node, assoc, %{__id__: id} = _target) do
-    Map.put(node, assoc, id)
-  end
-
-  def property(nodes, property_name) when is_list(nodes) do
-    Enum.map(nodes, &Map.get(&1, property_name))
-  end
-
-  def property(node, property_name) do
-    Map.get(node, property_name)
-  end
-
   # Node set operations
-
   def intersection(nodes1, nodes2) when is_list(nodes1) and is_list(nodes2) do
     # TODO: check node type
     Enum.filter(nodes1, fn %{__id__: a} ->
@@ -261,7 +284,7 @@ defmodule Gim.Query do
 
     lonely =
       all_nodes
-      |> Enum.filter(&has_no_edges?/1)
+      |> Enum.reject(&has_edges?/1)
       |> Enum.map(fn %{__struct__: struct, __id__: id} -> {struct, id} end)
       |> Enum.into(MapSet.new())
 

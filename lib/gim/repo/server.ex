@@ -18,6 +18,8 @@ defmodule Gim.Repo.Server do
         end)
 
       {:ok, struct(module, tables)}
+    else
+      _ -> {:error, :unexpected}
     end
   end
 
@@ -47,6 +49,10 @@ defmodule Gim.Repo.Server do
       :error ->
         {:reply, {:error, %Gim.NoSuchTypeError{message: "No such Type #{inspect(type)}"}}, state}
     end
+  end
+
+  def handle_call({:insert, %{__id__: id}} = node, _from, state) when not is_nil(id) do
+    {:reply, {:error, %Gim.DuplicateNodeError{message: "Duplicate Node #{inspect(node)}"}}, state}
   end
 
   def handle_call({:insert, %{__struct__: type} = node}, _from, %repo{} = state) do
@@ -89,7 +95,13 @@ defmodule Gim.Repo.Server do
     node
   end
 
-  defp update(state, %{__struct__: type, __id__: id} = node, opts \\ []) do
+  defp update(state, node, opts \\ [])
+
+  defp update(_state, %{__id__: nil} = node, _opts) do
+    {:error, %Gim.NoNodeError{message: "No Node, id is nil for #{inspect(node)}"}}
+  end
+
+  defp update(state, %{__struct__: type, __id__: id} = node, opts) do
     with {:ok, {_, module, table}} <- Map.fetch(state, type),
          {:ok, [old_node]} <- module.query(table, [id], []) do
       node =

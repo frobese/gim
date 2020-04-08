@@ -46,10 +46,13 @@ defmodule Gim.Repo do
           name: args[:name],
           spawn_opt: [fullsweep_after: 50]
         )
+      rescue
+        # Its needed since the spawn ops mess with the dialyzer
+        _e in ArgumentError ->
+          {:error, :unexpected}
       end
 
       # API
-
       def types do
         unquote(types)
       end
@@ -58,8 +61,26 @@ defmodule Gim.Repo do
         GenServer.call(__MODULE__, {:all})
       end
 
+      def resolve(%Gim.Query{type: type, expand: expand} = query)
+          when is_type(type) and length(expand) > 0 do
+        case GenServer.call(__MODULE__, {:resolve, query}) do
+          {:ok, nodes} ->
+            Gim.Repo.__expand__(nodes, expand)
+
+          error ->
+            error
+        end
+      end
+
       def resolve(%Gim.Query{type: type} = query) when is_type(type) do
         GenServer.call(__MODULE__, {:resolve, query})
+      end
+
+      def resolve!(query) do
+        case resolve(query) do
+          {:ok, nodes} -> nodes
+          {:error, error} -> raise error
+        end
       end
 
       def all(type) when is_type(type) do
@@ -68,25 +89,8 @@ defmodule Gim.Repo do
 
       def all!(type) when is_type(type) do
         case all(type) do
-          {:ok, res} -> res
+          {:ok, nodes} -> nodes
           {:error, exception} -> raise exception
-        end
-      end
-
-      @doc """
-      Get all nodes of a given type with key==value.
-      Always returns a list.
-      """
-      def get_by(type, key, value) when is_type(type) do
-        case all(type) do
-          {:ok, res} ->
-            Enum.filter(res, fn
-              %{^key => ^value} -> true
-              _ -> false
-            end)
-
-          err ->
-            err
         end
       end
 
@@ -101,23 +105,11 @@ defmodule Gim.Repo do
         end
       end
 
-      def get(type, _key, _value) do
-        raise Gim.NoSuchTypeError, "No such Type #{inspect(type)}"
-      end
-
       @doc """
       Get a node by a given edge, or list of nodes by given edges.
       """
       def fetch!(type, id) when is_type(type) do
         fetch!(type, :__id__, id)
-      end
-
-      def fetch_or(type, id) do
-        case fetch!(type, id) do
-          {:ok, res} -> res
-          x when is_list(x) -> x
-          x -> raise Gim.NoNodeError, "No such Node #{inspect(x)}"
-        end
       end
 
       @doc """
@@ -151,9 +143,20 @@ defmodule Gim.Repo do
         # remove all edges
         naked = Gim.Query.clear_edges(node)
 
-        {:ok, %{__id__: id, __repo__: repo}} = insert(naked)
+        case insert(naked) do
+          {:ok, %{__id__: id, __repo__: repo}} ->
+            {:ok, %{node | __id__: id, __repo__: repo}}
 
-        %{node | __id__: id, __repo__: repo}
+          error ->
+            error
+        end
+      end
+
+      def create!(node) do
+        case create(node) do
+          {:ok, node} -> node
+          {:error, error} -> raise error
+        end
       end
 
       @doc """
@@ -165,8 +168,8 @@ defmodule Gim.Repo do
 
       def insert!(node) do
         case insert(node) do
-          {:ok, res} -> res
-          x -> raise Gim.DuplicateNodeError, "Duplicate Node #{inspect(x)}"
+          {:ok, node} -> node
+          {:error, error} -> raise error
         end
       end
 
@@ -175,7 +178,13 @@ defmodule Gim.Repo do
       """
       def update(node) do
         GenServer.call(__MODULE__, {:update, node})
-        node
+      end
+
+      def update!(node) do
+        case update(node) do
+          {:ok, node} -> node
+          {:error, error} -> raise error
+        end
       end
 
       @doc """
@@ -187,8 +196,8 @@ defmodule Gim.Repo do
 
       def merge!(node) do
         case merge(node) do
-          {:ok, res} -> res
-          x -> raise Gim.NoNodeError, "No such Node #{inspect(x)}"
+          {:ok, node} -> node
+          {:error, error} -> raise error
         end
       end
 
@@ -210,7 +219,7 @@ defmodule Gim.Repo do
         # 1st pass: Create (insert)
         nodes =
           nodes
-          |> Enum.map(fn {k, node} -> {k, create(node)} end)
+          |> Enum.map(fn {k, node} -> {k, create!(node)} end)
           |> Enum.into(%{})
 
         # 2nd pass: Resolve (merge)
@@ -218,6 +227,35 @@ defmodule Gim.Repo do
         |> Enum.map(fn {k, node} -> Gim.Repo.__put_assocs__(node, nodes, errors) end)
         |> Enum.map(fn node -> merge(node) end)
       end
+    end
+  end
+
+  def __expand__(nodes, []) do
+    {:ok, nodes}
+  end
+
+  def __expand__(nodes, path) when is_list(nodes) do
+    Enum.reduce_while(Enum.reverse(nodes), {:ok, []}, fn node, {:ok, acc} ->
+      case __expand__(node, path) do
+        {:ok, node} -> {:cont, {:ok, [node | acc]}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  def __expand__(%{__repo__: repo} = node, [{edge, nested} | path]) when is_map(node) do
+    with {:ok, nodes} <- repo.resolve(Gim.Query.query(node, edge)),
+         {:ok, nodes} <- __expand__(nodes, nested) do
+      Map.update!(node, edge, fn assoc ->
+        if is_list(assoc) do
+          nodes
+        else
+          List.first(nodes)
+        end
+      end)
+      |> __expand__(path)
+    else
+      error -> error
     end
   end
 

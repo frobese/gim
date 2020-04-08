@@ -26,9 +26,9 @@ defmodule GimTest do
     assert_raise Gim.NoNodeError, fn -> Repo.fetch!(Book, :title, "Neuroma") end
   end
 
-  test "get_by" do
-    assert [%Book{body: nil} | _] = Repo.get_by(Book, :body, nil)
-  end
+  # test "get_by" do
+  #   assert [%Book{body: nil} | _] = Repo.get_by(Book, :body, nil)
+  # end
 
   test "get" do
     assert [%Book{title: "Neuromancer"}] = Repo.get(Book, :title, "Neuromancer")
@@ -43,7 +43,7 @@ defmodule GimTest do
   test "edges" do
     assert [book] = Repo.get(Book, :title, "Neuromancer")
 
-    assert %Author{name: "William Gibson"} = author = Gim.Query.edge(book, :authored_by)
+    assert [%Author{name: "William Gibson"}] = [author] = Gim.Query.edges(book, :authored_by)
 
     assert [%Book{title: "Neuromancer"}, %Book{title: "Count Zero"}] =
              Enum.sort(Gim.Query.edges(author, :author_of))

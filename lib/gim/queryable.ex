@@ -4,12 +4,6 @@ defprotocol Gim.Queryable do
   def to_query(data)
 end
 
-defimpl Gim.Queryable, for: Query do
-  def to_query(query) do
-    query
-  end
-end
-
 defimpl Gim.Queryable, for: Atom do
   def to_query(module) do
     try do

@@ -108,7 +108,7 @@ defmodule Gim.Schema do
 
     quote do
       unquote(prelude)
-      unquote(postlude)
+      unquote(postlude)   
     end
   end
 
@@ -302,8 +302,6 @@ defmodule Gim.Schema do
   end
 
   defp check_type!(type, fun_arity) do
-    # Can't use function_exported?(type, :__info__, 1)
-    # Can't use Module.defines?(type, {:__schema__, 1})
     # Just catch the worst typos
     unless type |> to_string() |> String.starts_with?("Elixir.") do
       raise ArgumentError, "invalid type #{inspect type} for #{fun_arity}"
@@ -316,9 +314,4 @@ defmodule Gim.Schema do
       nil -> :ok
     end
   end
-
-#  defp expand_alias({:__aliases__, _, _} = ast, env),
-#    do: Macro.expand(ast, %{env | function: {:__schema__, 2}})
-#  defp expand_alias(ast, _env),
-#    do: ast
 end
