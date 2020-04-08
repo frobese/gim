@@ -54,7 +54,7 @@ defmodule Gim.Schema do
   @doc """
   Defines a schema struct with a source name and property definitions.
   """
-  defmacro schema([do: block]) do
+  defmacro schema(do: block) do
     prelude =
       quote do
         Module.register_attribute(__MODULE__, :struct_fields, accumulate: true)
@@ -70,48 +70,59 @@ defmodule Gim.Schema do
       quote unquote: false do
         defstruct @struct_fields
 
-        props = @gim_props |> Enum.reverse
-        assocs = @gim_assocs |> Enum.reverse
+        props = @gim_props |> Enum.reverse()
+        assocs = @gim_assocs |> Enum.reverse()
 
         def __schema__(:gim), do: true
 
         def __schema__(:properties), do: unquote(Enum.map(props, &elem(&1, 0)))
 
-        def __schema__(:indexes), do: unquote(props |> Enum.filter(&elem(&1, 1)) |> Enum.map(&elem(&1, 0)))
+        def __schema__(:indexes),
+          do: unquote(props |> Enum.filter(&elem(&1, 1)) |> Enum.map(&elem(&1, 0)))
 
         for {prop, index} <- @gim_props do
           def __schema__(:index, unquote(prop)), do: unquote(index)
         end
+
         def __schema__(:index, _), do: nil
 
-        def __schema__(:indexes_unique), do: unquote(props |> Enum.filter(&elem(&1, 1) in [:unique, :primary]) |> Enum.map(&elem(&1, 0)))
+        def __schema__(:indexes_unique),
+          do:
+            unquote(
+              props
+              |> Enum.filter(&(elem(&1, 1) in [:unique, :primary]))
+              |> Enum.map(&elem(&1, 0))
+            )
 
-        def __schema__(:indexes_non_unique), do: unquote(props |> Enum.filter(&elem(&1, 1) == true) |> Enum.map(&elem(&1, 0)))
+        def __schema__(:indexes_non_unique),
+          do: unquote(props |> Enum.filter(&(elem(&1, 1) == true)) |> Enum.map(&elem(&1, 0)))
 
         def __schema__(:associations), do: unquote(Enum.map(assocs, &elem(&1, 0)))
 
         for {name, _, _, _} = assoc <- @gim_assocs do
           def __schema__(:association, unquote(name)), do: unquote(Macro.escape(assoc))
         end
+
         def __schema__(:association, _), do: nil
-        
+
         for {name, _, _, reflect} = assoc <- @gim_assocs do
           def __schema__(:reflect, unquote(name)), do: unquote(reflect)
         end
+
         def __schema__(:reflect, _), do: nil
-        
+
         for {name, _cardinality, type, _reflect} <- @gim_assocs do
           def __schema__(:type, unquote(name)), do: unquote(type)
         end
+
         def __schema__(:type, _), do: nil
-    end
+      end
 
     quote do
       unquote(prelude)
-      unquote(postlude)   
+      unquote(postlude)
     end
   end
-
 
   ## API
 
@@ -164,10 +175,17 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edges(name, type, opts \\ []) do
-    #type = expand_alias(type, __CALLER__)
+    # type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
+
     quote do
-      Gim.Schema.__has_edges__(__MODULE__, unquote(name), unquote(type), unquote(reflect), unquote(opts))
+      Gim.Schema.__has_edges__(
+        __MODULE__,
+        unquote(name),
+        unquote(type),
+        unquote(reflect),
+        unquote(opts)
+      )
 
       def unquote(name)(nodes) when is_list(nodes) do
         Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edges} ->
@@ -184,13 +202,17 @@ defmodule Gim.Schema do
         ids = Enum.map(nodes, fn %{__id__: id} -> id end)
         Map.update!(struct, unquote(name), fn x -> ids ++ x end)
       end
+
       def unquote(:"add_#{name}")(struct, %{__id__: id} = _node) do
         Map.update!(struct, unquote(name), fn x -> [id | x] end)
       end
 
       def unquote(:"delete_#{name}")(struct, nodes) when is_list(nodes) do
-        Map.update!(struct, unquote(name), fn edges -> Enum.reject(edges, &Enum.member?(nodes, &1)) end)
+        Map.update!(struct, unquote(name), fn edges ->
+          Enum.reject(edges, &Enum.member?(nodes, &1))
+        end)
       end
+
       def unquote(:"delete_#{name}")(struct, %{__id__: id} = _node) do
         Map.update!(struct, unquote(name), &List.delete(&1, id))
       end
@@ -199,6 +221,7 @@ defmodule Gim.Schema do
         ids = Enum.map(nodes, fn %{__id__: id} -> id end)
         Map.put(struct, unquote(name), ids)
       end
+
       def unquote(:"set_#{name}")(struct, %{__id__: id} = _node) do
         Map.put(struct, unquote(name), [id])
       end
@@ -226,10 +249,17 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edge(name, type, opts \\ []) do
-    #type = expand_alias(type, __CALLER__)
+    # type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
+
     quote do
-      Gim.Schema.__has_edge__(__MODULE__, unquote(name), unquote(type), unquote(reflect), unquote(opts))
+      Gim.Schema.__has_edge__(
+        __MODULE__,
+        unquote(name),
+        unquote(type),
+        unquote(reflect),
+        unquote(opts)
+      )
 
       def unquote(name)(nodes) when is_list(nodes) do
         Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edge} ->
@@ -258,11 +288,14 @@ defmodule Gim.Schema do
   def __property__(mod, name, opts) do
     check_options!(opts, @valid_property_options, "property/2")
     put_struct_property(mod, name, Keyword.get(opts, :default))
-    index = case Keyword.get(opts, :index) do
-      :primary -> :primary
-      :unique -> :unique
-      truthy -> !!truthy
-    end
+
+    index =
+      case Keyword.get(opts, :index) do
+        :primary -> :primary
+        :unique -> :unique
+        truthy -> !!truthy
+      end
+
     Module.put_attribute(mod, :gim_props, {name, index})
   end
 
@@ -295,7 +328,7 @@ defmodule Gim.Schema do
     props = Module.get_attribute(mod, :struct_fields)
 
     if List.keyfind(props, name, 0) do
-      raise ArgumentError, "property/association #{inspect name} is already set on schema"
+      raise ArgumentError, "property/association #{inspect(name)} is already set on schema"
     end
 
     Module.put_attribute(mod, :struct_fields, {name, assoc})
@@ -304,13 +337,13 @@ defmodule Gim.Schema do
   defp check_type!(type, fun_arity) do
     # Just catch the worst typos
     unless type |> to_string() |> String.starts_with?("Elixir.") do
-      raise ArgumentError, "invalid type #{inspect type} for #{fun_arity}"
+      raise ArgumentError, "invalid type #{inspect(type)} for #{fun_arity}"
     end
   end
 
   defp check_options!(opts, valid, fun_arity) do
-    case Enum.find(opts, fn {k, _} -> not(k in valid) end) do
-      {k, _} -> raise ArgumentError, "invalid option #{inspect k} for #{fun_arity}"
+    case Enum.find(opts, fn {k, _} -> not (k in valid) end) do
+      {k, _} -> raise ArgumentError, "invalid option #{inspect(k)} for #{fun_arity}"
       nil -> :ok
     end
   end
