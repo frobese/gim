@@ -1,5 +1,7 @@
 <img src="images/gim-wort-bildmarke.png" alt="gim_logo" height="100"/>
-=========
+
+---
+
 Schema-based In-Memory Graph Database for Elixir.
 
 Documentation is available on [hex.pm](https://hexdocs.pm/gim)
