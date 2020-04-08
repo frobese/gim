@@ -42,7 +42,6 @@ defmodule Gim.Schema do
 
   @doc false
   defmacro __using__(_) do
-    # apply(__MODULE__, which, [])
     quote do
       import Gim.Schema, only: [schema: 1]
 
@@ -57,6 +56,8 @@ defmodule Gim.Schema do
   defmacro schema(do: block) do
     prelude =
       quote do
+        @after_compile unquote(__MODULE__)
+
         Module.register_attribute(__MODULE__, :struct_fields, accumulate: true)
 
         Gim.Schema.__meta__(__MODULE__, :__id__, nil)
@@ -77,8 +78,9 @@ defmodule Gim.Schema do
 
         def __schema__(:properties), do: unquote(Enum.map(props, &elem(&1, 0)))
 
-        def __schema__(:indexes),
-          do: unquote(props |> Enum.filter(&elem(&1, 1)) |> Enum.map(&elem(&1, 0)))
+        def __schema__(:indexes) do
+          unquote(props |> Enum.filter(&elem(&1, 1)) |> Enum.map(&elem(&1, 0)))
+        end
 
         for {prop, index} <- @gim_props do
           def __schema__(:index, unquote(prop)), do: unquote(index)
@@ -86,30 +88,29 @@ defmodule Gim.Schema do
 
         def __schema__(:index, _), do: nil
 
-        def __schema__(:indexes_unique),
-          do:
-            unquote(
-              props
-              |> Enum.filter(&(elem(&1, 1) in [:unique, :primary]))
-              |> Enum.map(&elem(&1, 0))
-            )
+        def __schema__(:indexes_unique) do
+          unquote(
+            props
+            |> Enum.filter(&(elem(&1, 1) in [:unique, :primary]))
+            |> Enum.map(&elem(&1, 0))
+          )
+        end
 
-        def __schema__(:indexes_non_unique),
-          do: unquote(props |> Enum.filter(&(elem(&1, 1) == true)) |> Enum.map(&elem(&1, 0)))
+        def __schema__(:indexes_non_unique) do
+          unquote(props |> Enum.filter(&(elem(&1, 1) == true)) |> Enum.map(&elem(&1, 0)))
+        end
 
         def __schema__(:associations), do: unquote(Enum.map(assocs, &elem(&1, 0)))
 
-        for {name, _, _, _} = assoc <- @gim_assocs do
-          def __schema__(:association, unquote(name)), do: unquote(Macro.escape(assoc))
+        for {name, cardinality, type, refelct, _} <- @gim_assocs do
+          def __schema__(:association, unquote(name)) do
+            unquote(Macro.escape({name, cardinality, type, refelct}))
+          end
         end
 
         def __schema__(:association, _), do: nil
 
-        for {name, _, _, reflect} = assoc <- @gim_assocs do
-          def __schema__(:reflect, unquote(name)), do: unquote(reflect)
-        end
-
-        def __schema__(:reflect, _), do: nil
+        def __schema__(:gim_assocs), do: unquote(Macro.escape(@gim_assocs))
 
         for {name, _cardinality, type, _reflect} <- @gim_assocs do
           def __schema__(:type, unquote(name)), do: unquote(type)
@@ -175,8 +176,10 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edges(name, type, opts \\ []) do
-    # type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
+
+    type = Macro.expand_once(type, __CALLER__)
+    caller_stacktrace = Macro.Env.stacktrace(__CALLER__)
 
     quote do
       Gim.Schema.__has_edges__(
@@ -184,7 +187,8 @@ defmodule Gim.Schema do
         unquote(name),
         unquote(type),
         unquote(reflect),
-        unquote(opts)
+        unquote(opts),
+        unquote(Macro.escape(caller_stacktrace))
       )
 
       def unquote(name)(nodes) when is_list(nodes) do
@@ -249,8 +253,10 @@ defmodule Gim.Schema do
 
   """
   defmacro has_edge(name, type, opts \\ []) do
-    # type = expand_alias(type, __CALLER__)
     reflect = Keyword.get(opts, :reflect)
+
+    type = Macro.expand_once(type, __CALLER__)
+    caller_stacktrace = Macro.Env.stacktrace(__CALLER__)
 
     quote do
       Gim.Schema.__has_edge__(
@@ -258,7 +264,8 @@ defmodule Gim.Schema do
         unquote(name),
         unquote(type),
         unquote(reflect),
-        unquote(opts)
+        unquote(opts),
+        unquote(Macro.escape(caller_stacktrace))
       )
 
       def unquote(name)(nodes) when is_list(nodes) do
@@ -282,8 +289,15 @@ defmodule Gim.Schema do
     end
   end
 
-  @valid_property_options [:default, :index]
+  defmacro __after_compile__(env, _byte_code) do
+    module = env.module
+    # Checks for Assocs
+    for assoc <- module.__schema__(:gim_assocs) do
+      check_edges(module, assoc)
+    end
+  end
 
+  @valid_property_options [:default, :index]
   @doc false
   def __property__(mod, name, opts) do
     check_options!(opts, @valid_property_options, "property/2")
@@ -305,21 +319,20 @@ defmodule Gim.Schema do
   end
 
   @valid_has_options [:reflect]
-
   @doc false
-  def __has_edges__(mod, name, type, reflect, opts) do
+  def __has_edges__(mod, name, type, reflect, opts, caller_stacktrace) do
     check_type!(type, "has_edges/3")
     check_options!(opts, @valid_has_options, "has_edges/3")
     put_struct_property(mod, name, Keyword.get(opts, :default, []))
-    Module.put_attribute(mod, :gim_assocs, {name, :many, type, reflect})
+    Module.put_attribute(mod, :gim_assocs, {name, :many, type, reflect, caller_stacktrace})
   end
 
   @doc false
-  def __has_edge__(mod, name, type, reflect, opts) do
+  def __has_edge__(mod, name, type, reflect, opts, caller_stacktrace) do
     check_type!(type, "has_edge/3")
     check_options!(opts, @valid_has_options, "has_edge/3")
     put_struct_property(mod, name, Keyword.get(opts, :default))
-    Module.put_attribute(mod, :gim_assocs, {name, :one, type, reflect})
+    Module.put_attribute(mod, :gim_assocs, {name, :one, type, reflect, caller_stacktrace})
   end
 
   ## Private
@@ -346,5 +359,71 @@ defmodule Gim.Schema do
       {k, _} -> raise ArgumentError, "invalid option #{inspect(k)} for #{fun_arity}"
       nil -> :ok
     end
+  end
+
+  defp check_edges(module, {name, _cardinality, type, reflect, stacktrace}) do
+    with {:module, _module} <- Code.ensure_compiled(type),
+         _ <- type.__schema__(:gim),
+         false <- is_nil(reflect),
+         {_name, _cardinality, ^module, ^name} <- type.__schema__(:association, reflect) do
+      :ok
+    else
+      true ->
+        :ok
+
+      nil ->
+        message = "The targeted edge #{inspect(reflect)} is not present in #{inspect(type)}"
+        reraise Gim.SchemaError, message, stacktrace
+
+      {_name, _cardinality, ^module, nil} ->
+        :ok
+
+      {_name, _cardinality, ^module, re_reflect} ->
+        unless module.__schema__(:association, re_reflect) do
+          message = ~s'''
+          Bidirectional edges should target each other.
+          The target edge #{inspect(reflect)} in #{inspect(module)} targets #{inspect(re_reflect)} but was expected to be #{
+            inspect(name)
+          }
+          '''
+
+          reraise Gim.SchemaError, message, stacktrace
+        else
+          :ok
+        end
+
+      {_name, _cardinality, re_module, _} ->
+        message = ~s'''
+        The type of the target edge #{inspect(reflect)} in #{inspect(module)} is #{
+          inspect(re_module)
+        } but was expected to be #{inspect(module)}
+        '''
+
+        reraise Gim.SchemaError, message, stacktrace
+
+      # {:error, :embedded} ->
+      #   IO.warn("embedded", stacktrace)
+
+      # {:error, :badfile} ->
+      #   IO.warn("badfile", stacktrace)
+
+      # {:error, :nofile} ->
+      #   IO.warn("nofile", stacktrace)
+
+      # {:error, :on_load_failur} ->
+      #   IO.warn("on_load_failur", stacktrace)
+      {:error, error} ->
+        message = ~s'''
+        The reflection could not be checked. Loading #{inspect(type)} resulted in a #{
+          inspect(error)
+        } error, see "Code.ensure_compiled/1" for more information.
+        '''
+
+        IO.warn(message, stacktrace)
+    end
+  rescue
+    UndefinedFunctionError ->
+      message = "The target type #{inspect(type)} is not a gim schema"
+      reraise Gim.SchemaError, message, stacktrace
   end
 end

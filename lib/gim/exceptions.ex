@@ -46,3 +46,10 @@ defmodule Gim.QueryError do
   """
   defexception [:message]
 end
+
+defmodule Gim.SchemaError do
+  @moduledoc """
+  Raised at compiletime when a schema is invalid.
+  """
+  defexception [:message]
+end
