@@ -1,6 +1,8 @@
 defmodule GimTest.SchemaTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureIO
+
   setup context do
     on_exit(fn ->
       [Target, Source]
@@ -69,6 +71,18 @@ defmodule GimTest.SchemaTest do
                        end
                      )
                    end
+    end
+
+    test "Missing reflect" do
+      output =
+        capture_io(:stdio, fn ->
+          Kernel.ParallelCompiler.compile(["etc/target.ex", "etc/source.ex"])
+        end)
+
+      assert String.contains?(
+               output,
+               "\*\* (Gim.SchemaError) Bidirectional edges should target each other.\nAdd a reflect to the target edge"
+             )
     end
 
     test "Not a gim schema" do

@@ -375,8 +375,20 @@ defmodule Gim.Schema do
         message = "The targeted edge #{inspect(reflect)} is not present in #{inspect(type)}"
         reraise Gim.SchemaError, message, stacktrace
 
-      {_name, _cardinality, ^module, nil} ->
-        :ok
+      {reflect_name, reflect_cardinality, ^module, nil} ->
+        message = ~s'''
+        Bidirectional edges should target each other.
+        Add a reflect to the target edge:
+            schema do
+              # ...
+              has_edge#{if reflect_cardinality == :many, do: "s", else: ""}(#{
+          inspect(reflect_name)
+        }, #{inspect(module)}, reflect: #{inspect(name)})
+              # ...
+            end
+        '''
+
+        reraise Gim.SchemaError, message, stacktrace
 
       {_name, _cardinality, ^module, re_reflect} ->
         unless module.__schema__(:association, re_reflect) do
@@ -389,6 +401,7 @@ defmodule Gim.Schema do
 
           reraise Gim.SchemaError, message, stacktrace
         else
+          # In this case the reflect of the target is invalid, an error will be raised in its check
           :ok
         end
 
