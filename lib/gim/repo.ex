@@ -26,6 +26,8 @@ defmodule Gim.Repo do
     quote bind_quoted: [types: types, guard: guard] do
       alias Gim.Query
 
+      @after_compile Gim.Repo
+
       defstruct types
 
       quote do
@@ -226,6 +228,22 @@ defmodule Gim.Repo do
         nodes
         |> Enum.map(fn {k, node} -> Gim.Repo.__put_assocs__(node, nodes, errors) end)
         |> Enum.map(fn node -> merge(node) end)
+      end
+    end
+  end
+
+  def __after_compile__(caller, _byte_code) do
+    types = caller.module.types()
+
+    for type <- types do
+      for {_name, _cardinality, assoc_type, _reflect, _stacktrace} <- type.__schema__(:gim_assocs) do
+        unless assoc_type in types do
+          message = ~s'''
+          #{inspect(type)} has an edge targeting #{inspect(assoc_type)} which is not part of the Repository
+          '''
+
+          reraise Gim.NoSuchTypeError, message, Macro.Env.stacktrace(caller)
+        end
       end
     end
   end
