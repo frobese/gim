@@ -27,18 +27,21 @@ defmodule GimTest.TableTest do
         end
 
         @tag table: true
+        @tag data_animal: true
         test "all", %{module: module, table: table} do
           assert {:ok, animals} = module.query(table, nil, [])
           assert 473 == length(animals)
         end
 
         @tag table: true
+        @tag data_animal: true
         test "fetch", %{module: module, table: table} do
           assert {:ok, [%Animal{impound_no: "K12-000416"}]} =
                    module.query(table, nil, impound_no: "K12-000416")
         end
 
         @tag table: true
+        @tag data_animal: true
         test "simple queries", %{module: module, table: table} do
           {:ok, dogs} = module.query(table, nil, animal_type: "Dog")
 
@@ -93,8 +96,12 @@ defmodule GimTest.TableTest do
         end
 
         @tag table: true
+        @tag data_animal: true
         test "filter with function", %{module: module, table: table} do
-          module.query(table, nil, impound_no: &String.ends_with?(&1, "1"))
+          assert {:ok, animals} =
+                   module.query(table, nil, impound_no: &String.ends_with?(&1, "1"))
+
+          assert 45 == length(animals)
         end
       end
     end

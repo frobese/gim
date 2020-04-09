@@ -117,6 +117,7 @@ defmodule GimTest.QueryTest do
     end
 
     @tag query: true
+    @tag data_animal: true
     test "fetch" do
       assert {:ok, [%Animal{impound_no: "K12-000416"}]} =
                Animal
@@ -126,6 +127,7 @@ defmodule GimTest.QueryTest do
     end
 
     @tag query: true
+    @tag data_animal: true
     test "simple queries" do
       {:ok, dogs} =
         Animal
