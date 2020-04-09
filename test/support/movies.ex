@@ -156,8 +156,12 @@ defmodule GimTest.Movies do
     # 197408 records: Time: 4.4 s, Memory usage: 180.2 MB, 22.3 us/op
     # 316886 records: Time: 8.4 s, Memory usage: 219.1 MB, 26.4 us/op
 
+    # "flag" for gc
     data = nil
+    # inspect to suppress warning
+    inspect(data)
     :erlang.garbage_collect()
+
     loaded4 = :erlang.memory(:total)
     memory = (loaded3 - loaded4) / 1024 / 1024
     IO.puts("GC freed: #{Float.round(memory, 1)} MB")
