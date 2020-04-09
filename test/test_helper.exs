@@ -3,8 +3,8 @@ require Logger
 # ex_unit_conf = IO.inspect(ExUnit.configuration())
 
 requirements = [
-  {GimTest.Animal, :data_animal},
-  {GimTest.Movies, :data_movies}
+  {GimTest.Animal, :data_animal}
+  # {GimTest.Movies, :data_movies}
 ]
 
 for {module, data_tag} <- requirements do
