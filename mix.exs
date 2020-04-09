@@ -1,7 +1,7 @@
 defmodule Gim.MixProject do
   use Mix.Project
 
-  @version "1.1.0"
+  @version "1.2.0"
 
   def project do
     [
@@ -47,6 +47,7 @@ defmodule Gim.MixProject do
   defp docs do
     [
       main: "Gim",
+      source_ref: "v#{@version}",
       logo: "images/gim-bildmarke.png",
       canonical: "http://hexdocs.pm/gim",
       source_url: "https://github.com/frobese/gim"
