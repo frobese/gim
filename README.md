@@ -3,7 +3,7 @@
 ---
 
 
-[![Build Status](https://github.com/frobese/gim/workflows/Elixir%20CI/badge.svg)](https://github.com/frobese/gim/actions)
+[![Build Status](https://github.com/frobese/gim/workflows/CI/badge.svg)](https://github.com/frobese/gim/actions)
 
 Schema-based In-Memory Graph Database for Elixir.
 

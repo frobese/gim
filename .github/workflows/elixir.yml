@@ -1,10 +1,16 @@
-name: Elixir CI
+name: CI
 
 on:
   push:
     branches: [ master ]
+    # paths:
+    #     - 'test/*'
+    #     - 'lib/*'
+    #     - '.github/*'
   pull_request:
     branches: [ master ]
+env:
+  MIX_ENV: test
 
 jobs:
   build:
@@ -16,7 +22,7 @@ jobs:
     - name: Setup elixir
       uses: actions/setup-elixir@v1
       with:
-        elixir-version: 1.9.4 # Define the elixir version [required]
+        elixir-version: 1.10.2 # Define the elixir version [required]
         otp-version: 22.2 # Define the OTP version [required]
     - name: Install Dependencies
       run: mix deps.get
