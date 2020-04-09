@@ -1,6 +1,7 @@
 alias Gim.Query
 
 defprotocol Gim.Queryable do
+  @moduledoc false
   def to_query(data)
 end
 

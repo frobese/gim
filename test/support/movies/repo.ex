@@ -3,7 +3,6 @@ defmodule GimTest.Movies.Repo do
   alias GimTest.Movies
   alias __MODULE__
 
-  @moduledoc false
   use Gim.Repo,
     types: [
       Movies.Person,

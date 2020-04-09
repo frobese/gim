@@ -213,15 +213,15 @@ defmodule GimTest.Movies do
       :timer.tc(fn ->
         "1million.rdf.gz"
         |> File.stream!([:compressed])
-        |> Gim.Rdf.read_rdf(&Data.predicate_fun/1)
-        |> Data.map_movies()
+        |> Gim.Rdf.read_rdf(&predicate_fun/1)
+        |> map_movies()
       end)
 
     secs = usecs / 1_000_000
     IO.puts("Disk load: #{Float.round(secs, 1)} s")
 
     # not needed with proper data
-    data = data |> Data.resolve_nodes()
+    data = data |> resolve_nodes()
 
     empty = :erlang.memory(:total)
 

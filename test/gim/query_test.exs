@@ -5,7 +5,6 @@ defmodule GimTest.QueryTest do
   import Gim.Query
 
   alias Gim.Query
-  alias Gim.Repo.Table
   alias GimTest.{Animal, Biblio}
 
   defmodule Repo do
@@ -36,7 +35,8 @@ defmodule GimTest.QueryTest do
   end
 
   describe "Filter" do
-    alias GimTest.Biblio.{Author, Book, Publisher}
+    # alias GimTest.Biblio.{Author, Book, Publisher}
+    alias GimTest.Biblio.Author
 
     test "simple join" do
       query = query(Author)
@@ -74,7 +74,8 @@ defmodule GimTest.QueryTest do
   end
 
   describe "Expand" do
-    alias GimTest.Biblio.{Author, Book, Publisher}
+    # alias GimTest.Biblio.{Author, Book, Publisher}
+    alias GimTest.Biblio.Author
 
     test "simple expand" do
       query = query(Author)

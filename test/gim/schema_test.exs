@@ -16,32 +16,7 @@ defmodule GimTest.SchemaTest do
   end
 
   describe "Reflects" do
-    test "Working bidirectional edge" do
-      assert [_, _] =
-               Code.compile_quoted(
-                 quote do
-                   defmodule Target do
-                     use Gim.Schema
-
-                     schema do
-                       property(:prop)
-                       has_edge(:target_edge, Source, reflect: :target)
-                     end
-                   end
-
-                   defmodule Source do
-                     use Gim.Schema
-
-                     schema do
-                       property(:prop)
-                       has_edge(:target, Target, reflect: :target_edge)
-                     end
-                   end
-                 end
-               )
-    end
-
-    test "mssing target" do
+    test "missing target" do
       assert_raise Gim.SchemaError,
                    "The targeted edge :target_edge is not present in Target",
                    fn ->
