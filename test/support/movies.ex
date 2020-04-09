@@ -12,6 +12,16 @@ defmodule GimTest.Movies do
     :ok
   end
 
+  def data_info do
+    path = Path.join(["etc", "1million.rdf.gz"])
+
+    url = "https://github.com/dgraph-io/benchmarks/raw/master/data/1million.rdf.gz"
+
+    md5_sum = "95de58e6a1c3246270f2fbf036574067"
+
+    {path, url, md5_sum}
+  end
+
   def map_movies(rdf) do
     Enum.map(rdf, &build_node/1)
     |> Enum.into(%{})

@@ -76,6 +76,17 @@ defmodule GimTest.Animal do
     property(:days_shelter)
   end
 
+  def data_info do
+    path = Path.join(["etc", "AnimalData.csv"])
+
+    url =
+      "http://raw.githubusercontent.com/KarenWest/FundamentalsOfDataAnalysisInLanguageR/master/AnimalData.csv"
+
+    md5_sum = "78cc1365ee7f9798d6dfd02cb35aab74"
+
+    {path, url, md5_sum}
+  end
+
   def data do
     path = Path.join(["etc", "AnimalData.csv"])
 
