@@ -19,20 +19,29 @@ defmodule Gim.Repo do
 
   @doc false
   defmacro __using__(opts) do
-    types = Keyword.get(opts, :types, [])
+    types = Macro.expand(Keyword.get(opts, :types, []), __CALLER__)
 
-    guard = guard(Macro.expand(types, __CALLER__))
-
-    quote bind_quoted: [types: types, guard: guard] do
+    quote bind_quoted: [types: types] do
       alias Gim.Query
 
       @after_compile Gim.Repo
 
       defstruct types
 
-      quote do
-        guard
-      end
+      conditions =
+        types
+        |> Enum.map(fn type ->
+          quote do
+            type == unquote(type)
+          end
+        end)
+        |> Enum.reduce(fn guard, acc ->
+          quote do
+            unquote(guard) or unquote(acc)
+          end
+        end)
+
+      defguard is_type(type) when unquote(conditions)
 
       @default_args [
         name: __MODULE__,
@@ -297,30 +306,5 @@ defmodule Gim.Repo do
           add_edge(node, assoc, link_node)
       end
     end)
-  end
-
-  defp guard([]) do
-    quote do
-      defguard is_type(_) when false
-    end
-  end
-
-  defp guard(types) do
-    conditions =
-      types
-      |> Enum.map(fn type ->
-        quote do
-          type == unquote(type)
-        end
-      end)
-      |> Enum.reduce(fn guard, acc ->
-        quote do
-          unquote(guard) or unquote(acc)
-        end
-      end)
-
-    quote do
-      defguard is_type(type) when unquote(conditions)
-    end
   end
 end

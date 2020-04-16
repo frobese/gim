@@ -178,7 +178,7 @@ defmodule Gim.Schema do
   defmacro has_edges(name, type, opts \\ []) do
     reflect = Keyword.get(opts, :reflect)
 
-    type = Macro.expand_once(type, __CALLER__)
+    type = Macro.expand(type, __CALLER__)
     caller_stacktrace = Macro.Env.stacktrace(__CALLER__)
 
     quote do
@@ -255,7 +255,7 @@ defmodule Gim.Schema do
   defmacro has_edge(name, type, opts \\ []) do
     reflect = Keyword.get(opts, :reflect)
 
-    type = Macro.expand_once(type, __CALLER__)
+    type = Macro.expand(type, __CALLER__)
     caller_stacktrace = Macro.Env.stacktrace(__CALLER__)
 
     quote do

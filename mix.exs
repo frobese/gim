@@ -1,7 +1,7 @@
 defmodule Gim.MixProject do
   use Mix.Project
 
-  @version "1.2.1"
+  @version "1.2.2"
 
   def project do
     [
@@ -34,7 +34,7 @@ defmodule Gim.MixProject do
   defp deps do
     [
       {:ex_doc, "~> 0.19", only: :dev},
-      {:jason, "~> 1.0"},
+      # {:jason, "~> 1.0"},
       {:nimble_csv, "~> 0.7", only: [:dev, :test]},
       {:observer_cli, "~> 1.5", only: :dev}
     ]
