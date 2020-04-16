@@ -57,4 +57,16 @@ defmodule GimTest do
     assert Biblio.Repo.is_type(Publisher)
     refute Biblio.Repo.is_type(GimTest.Animal)
   end
+
+  test "add edge" do
+    assert {:ok, the_light} = Biblio.Repo.fetch(Biblio.Book, :title, "The Light Fantastic")
+    assert {:ok, book} = Biblio.Repo.insert(%Biblio.Book{title: "The Colour of Magic"})
+    assert {:ok, terry} = Biblio.Repo.fetch(Biblio.Author, :name, "Terry Pratchett")
+
+    book_with_author = Biblio.Book.set_authored_by(book, terry)
+    assert {:ok, _book} = Biblio.Repo.update(book_with_author)
+
+    book_with_similar_to = Biblio.Book.set_similar_to(book, the_light)
+    assert {:ok, _book} = Biblio.Repo.update(book_with_similar_to)
+  end
 end

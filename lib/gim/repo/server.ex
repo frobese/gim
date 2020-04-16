@@ -146,6 +146,9 @@ defmodule Gim.Repo.Server do
   defp reflect_assocs(state, %struct{} = node, old_node) do
     Enum.each(struct.__schema__(:associations), fn assoc ->
       case struct.__schema__(:association, assoc) do
+        {_assoc, _cardinality, _type, nil} ->
+          :ok
+
         {_assoc, :one, type, reflect} ->
           new_id = Map.fetch!(node, assoc)
           old_id = Map.fetch!(old_node, assoc)
