@@ -47,6 +47,11 @@ defmodule GimTest do
 
     assert [%Book{title: "Neuromancer"}, %Book{title: "Count Zero"}] =
              Enum.sort(Gim.Query.edges(author, :author_of))
+
+    assert [%Book{title: "Neuromancer"}, %Book{title: "Count Zero"}] =
+             books = Author.author_of(author)
+
+    assert [^author] = Book.authored_by(books)
   end
 
   test "repo guard" do

@@ -192,14 +192,19 @@ defmodule Gim.Schema do
       )
 
       def unquote(name)(nodes) when is_list(nodes) do
-        Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edges} ->
-          repo.fetch!(unquote(type), edges)
-        end)
-        |> Enum.uniq()
+        Gim.Query.edges(nodes, unquote(name))
+        # Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edges} ->
+        #   repo.fetch!(unquote(type), edges)
+        # end)
+        # |> Enum.uniq()
       end
 
-      def unquote(name)(%{:__repo__ => repo, unquote(name) => edges} = _node) do
-        repo.fetch!(unquote(type), edges)
+      def unquote(name)(%{:__repo__ => _repo, unquote(name) => []} = _node), do: []
+
+      def unquote(name)(%{:__repo__ => repo, unquote(name) => edges} = node) do
+        Gim.Query.edges(node, unquote(name))
+
+        # repo.fetch!(unquote(type), edges)
       end
 
       def unquote(:"add_#{name}")(struct, nodes) when is_list(nodes) do
@@ -269,14 +274,19 @@ defmodule Gim.Schema do
       )
 
       def unquote(name)(nodes) when is_list(nodes) do
-        Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edge} ->
-          repo.fetch!(unquote(type), edge)
-        end)
-        |> Enum.uniq()
+        Gim.Query.edges(nodes, unquote(name))
+        # Enum.map(nodes, fn %{:__repo__ => repo, unquote(name) => edge} ->
+        #   repo.fetch!(unquote(type), edge)
+        # end)
+        # |> Enum.uniq()
       end
 
-      def unquote(name)(%{:__repo__ => repo, unquote(name) => edge} = _node) do
-        repo.fetch!(unquote(type), edge)
+      def unquote(name)(%{:__repo__ => _repo, unquote(name) => nil} = _node), do: nil
+
+      def unquote(name)(%{:__repo__ => repo, unquote(name) => edge} = node) do
+        Gim.Query.edges(node, unquote(name))
+
+        # repo.fetch!(unquote(type), edge)
       end
 
       def unquote(:"set_#{name}")(struct, %{__id__: id} = _node) do

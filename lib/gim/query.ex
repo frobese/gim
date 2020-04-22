@@ -59,18 +59,17 @@ defmodule Gim.Query do
   end
 
   def __query__(%__MODULE__{} = query, edge, [%{} = node | nodes]) do
-    edge = Map.fetch!(node, edge)
-
-    edge
+    node
+    |> Map.fetch!(edge)
     |> List.wrap()
     |> Enum.reduce(query, fn node_or_id, query ->
       if is_integer(node_or_id) do
         filter(query, :or, __id__: node_or_id)
       else
-        __query__(query, node_or_id)
+        __query__(query, edge, node_or_id)
       end
     end)
-    |> __query__(nodes)
+    |> __query__(edge, nodes)
   end
 
   @doc """
