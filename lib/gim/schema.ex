@@ -198,6 +198,8 @@ defmodule Gim.Schema do
         |> Enum.uniq()
       end
 
+      def unquote(name)(%{:__repo__ => _repo, unquote(name) => []} = _node), do: []
+
       def unquote(name)(%{:__repo__ => repo, unquote(name) => edges} = _node) do
         repo.fetch!(unquote(type), edges)
       end
@@ -274,6 +276,8 @@ defmodule Gim.Schema do
         end)
         |> Enum.uniq()
       end
+
+      def unquote(name)(%{:__repo__ => _repo, unquote(name) => nil} = _node), do: nil
 
       def unquote(name)(%{:__repo__ => repo, unquote(name) => edge} = _node) do
         repo.fetch!(unquote(type), edge)
