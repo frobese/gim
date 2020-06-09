@@ -74,7 +74,7 @@ defmodule Gim.Repo.Server do
   end
 
   def handle_call({:update, node}, _from, state) do
-    {:reply, update(state, node), state}
+    {:reply, update(state, node, reflect: true), state}
   end
 
   def handle_call({:delete, %{__struct__: type, __id__: _id} = node}, _from, state) do
@@ -157,13 +157,13 @@ defmodule Gim.Repo.Server do
             unless is_nil(old_id) do
               reflect_node = Query.delete_edge(get!(state, type, old_id), reflect, old_node)
 
-              update(state, reflect_node, reflect: false)
+              update(state, reflect_node, reflect: true)
             end
 
             unless is_nil(new_id) do
               reflect_node = Query.add_edge(get!(state, type, new_id), reflect, node)
 
-              update(state, reflect_node, reflect: false)
+              update(state, reflect_node, reflect: true)
             end
           end
 
@@ -176,13 +176,13 @@ defmodule Gim.Repo.Server do
           Enum.each(removed, fn old_id ->
             reflect_node = Query.delete_edge(get!(state, type, old_id), reflect, old_node)
 
-            update(state, reflect_node, reflect: false)
+            update(state, reflect_node, reflect: true)
           end)
 
           Enum.each(added, fn new_id ->
             reflect_node = Query.add_edge(get!(state, type, new_id), reflect, node)
 
-            update(state, reflect_node, reflect: false)
+            update(state, reflect_node, reflect: true)
           end)
       end
     end)

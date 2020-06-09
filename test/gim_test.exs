@@ -74,4 +74,23 @@ defmodule GimTest do
     book_with_similar_to = Biblio.Book.set_similar_to(book, the_light)
     assert {:ok, _book} = Biblio.Repo.update(book_with_similar_to)
   end
+
+  test "change edge" do
+    assert {:ok, author} = Repo.insert(%Author{name: "John Doe", age: 42})
+    assert {:ok, books} = Repo.all(Book)
+
+    author = Author.set_author_of(author, books)
+
+    assert {:ok, _author} = Biblio.Repo.update(author)
+
+    for book <- Repo.all!(Book) do
+      assert book.authored_by == author.__id__
+    end
+
+    for auth <- Repo.all!(Author) do
+      unless auth.__id__ == author.__id__ do
+        assert auth.author_of == []
+      end
+    end
+  end
 end
